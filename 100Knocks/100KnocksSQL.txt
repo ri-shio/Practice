@@ -1,0 +1,980 @@
+-- S-001
+%%sql
+SELECT * FROM receipt LIMIT 10
+
+-- S-002
+%%sql
+SELECT sales_ymd, customer_id, product_cd, amount FROM receipt LIMIT 10
+
+-- S-003
+%%sql
+SELECT sales_ymd AS sales_date, customer_id, product_cd, amount FROM receipt LIMIT 10
+
+-- S-004
+%%sql
+SELECT sales_ymd, customer_id, product_cd, amount FROM receipt
+WHERE customer_id = 'CS018205000001'
+
+-- S-005
+%%sql
+SELECT sales_ymd, customer_id, product_cd, amount FROM receipt
+WHERE customer_id = 'CS018205000001' AND amount >= 1000
+
+-- S-006
+%%sql
+SELECT sales_ymd, customer_id, product_cd, quantity, amount FROM receipt
+WHERE customer_id = 'CS018205000001' AND (amount >= 1000 OR quantity >=5)
+
+-- S-007
+%%sql
+SELECT sales_ymd, customer_id, product_cd, amount FROM receipt
+WHERE customer_id = 'CS018205000001' AND amount BETWEEN 1000 AND 2000
+
+-- S-008
+%%sql
+SELECT sales_ymd, customer_id, product_cd, amount FROM receipt
+WHERE customer_id = 'CS018205000001' AND product_cd <> 'P071401019'
+
+-- S-009
+%%sql
+select * from store where not prefecture_cd = '13' and not floor_area > 900
+
+-- S-010
+%%sql
+SELECT * FROM store
+WHERE store_cd LIKE 'S14%'
+LIMIT 10
+
+-- S-011
+%%sql
+SELECT * FROM customer
+WHERE customer_id LIKE '%1'
+LIMIT 10
+
+-- S-012
+%%sql
+SELECT * FROM store
+WHERE address LIKE '%横浜市%'
+
+-- S-013
+%%sql
+SELECT * FROM customer
+WHERE status_cd ~ '[A-F].*'
+LIMIT 10
+
+-- S-014
+%%sql
+SELECT * FROM customer
+WHERE status_cd ~ '.*[1-9]'
+LIMIT 10
+
+-- S-015
+%%sql
+SELECT * FROM customer
+WHERE status_cd ~ '[A-F].*[1-9]'
+LIMIT 10
+
+-- S-016
+%%sql
+SELECT * FROM store
+WHERE tel_no ~ '[0-9]{3}-[0-9]{3}-[0-9]{4}'
+
+-- S-017
+%%sql
+SELECT * FROM customer
+ORDER BY birth_day ASC
+LIMIT 10
+
+-- S-018
+%%sql
+SELECT * FROM customer
+ORDER BY birth_day DESC
+LIMIT 10
+
+-- S-019
+%%sql
+SELECT customer_id, amount, RANK() OVER (ORDER BY amount DESC) FROM receipt
+LIMIT 10
+
+-- S-020
+%%sql
+SELECT customer_id, amount, ROW_NUMBER() OVER (ORDER BY amount DESC) FROM receipt
+LIMIT 10
+
+-- S-021
+%%sql
+SELECT COUNT(*) FROM receipt
+
+-- S-022
+%%sql
+SELECT COUNT(DISTINCT customer_id) FROM receipt
+
+-- S-023
+%%sql
+SELECT store_cd, SUM(amount), SUM(quantity) FROM receipt
+GROUP BY store_cd
+
+-- S-024
+%%sql
+SELECT customer_id, MAX(sales_ymd) FROM receipt
+GROUP BY customer_id
+LIMIT 10
+
+-- S-025
+%%sql
+SELECT customer_id, MIN(sales_ymd) FROM receipt
+GROUP BY customer_id
+LIMIT 10
+
+-- S-026
+%%sql
+SELECT customer_id, MAX(sales_ymd), MIN(sales_ymd) FROM receipt
+GROUP BY customer_id
+HAVING MAX(sales_ymd) <> MIN(sales_ymd)
+LIMIT 10
+
+-- S-027
+%%sql
+SELECT store_cd, AVG(amount) FROM receipt
+GROUP BY store_cd
+ORDER BY AVG(amount) DESC
+LIMIT 5
+
+-- S-028
+%%sql
+SELECT store_cd, PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) FROM receipt
+GROUP BY store_cd
+ORDER BY PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) DESC
+LIMIT 5
+
+-- S-029
+%%sql
+SELECT store_cd, MODE() WITHIN GROUP (ORDER BY product_cd) FROM receipt
+GROUP BY store_cd
+
+-- S-030
+%%sql
+SELECT store_cd, VAR_SAMP(amount) FROM receipt
+GROUP BY store_cd
+ORDER BY VAR_SAMP(amount) DESC
+LIMIT 5
+
+-- S-031
+%%sql
+SELECT store_cd, STDDEV(amount) FROM receipt
+GROUP BY store_cd
+ORDER BY STDDEV(amount) DESC
+LIMIT 5
+
+-- S-032
+%%sql
+SELECT
+PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY amount) AS percentile_25,
+PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) AS percentile_50,
+PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY amount) AS percentile_75
+FROM receipt
+
+-- S-033
+%%sql
+SELECT store_cd, AVG(amount) FROM receipt
+GROUP BY store_cd
+HAVING AVG(amount) >=330
+
+-- S-034
+%%sql
+SELECT AVG(sum_mem) FROM (
+    SELECT SUM(amount) AS sum_mem FROM receipt WHERE customer_id !~ 'Z.*' GROUP BY customer_id
+) AS member
+
+-- S-035
+%%sql
+WITH member AS (
+    SELECT customer_id, SUM(amount) AS sum_mem FROM receipt WHERE customer_id !~ 'Z.*' GROUP BY customer_id
+)
+SELECT customer_id FROM member
+WHERE sum_mem >= (SELECT AVG(sum_mem) FROM member)
+LIMIT 10
+
+-- S-036
+%%sql
+SELECT store_name, receipt.* FROM receipt
+INNER JOIN store ON receipt.store_cd = store.store_cd
+LIMIT 10
+
+-- S-037
+%%sql
+SELECT product.*, category_small_name FROM product
+INNER JOIN category ON product.category_small_cd = category.category_small_cd
+LIMIT 10
+
+-- S-038
+%%sql
+SELECT customer.customer_id,
+    SUM(CASE WHEN amount IS NULL THEN 0 ELSE amount END)
+FROM customer
+LEFT JOIN receipt ON receipt.customer_id = customer.customer_id
+WHERE gender_cd = '1' AND customer.customer_id !~ 'Z.*'
+GROUP BY customer.customer_id
+LIMIT 10
+
+-- S-039
+%%sql
+WITH freq20_mem AS (
+    SELECT customer_id FROM receipt WHERE customer_id !~ 'Z.*' GROUP BY customer_id ORDER BY COUNT(sales_ymd) DESC LIMIT 20
+),
+     high20_mem AS (
+SELECT customer_id FROM receipt WHERE customer_id !~ 'Z.*' GROUP BY customer_id ORDER BY SUM(amount) DESC LIMIT 20
+)
+
+SELECT freq20_mem.customer_id AS freq_20, high20_mem.customer_id AS high_20
+FROM freq20_mem FULL OUTER JOIN high20_mem ON freq20_mem.customer_id = high20_mem.customer_id
+
+-- S-040
+%%sql
+SELECT COUNT(*) FROM (SELECT * FROM store CROSS JOIN product) AS c_join
+
+-- S-041
+%%sql
+SELECT sales_ymd,
+sum_amount - MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING) AS amount_diff
+FROM
+(
+SELECT sales_ymd, SUM(amount) sum_amount
+FROM receipt
+GROUP BY sales_ymd
+) AS sum_amount_table
+LIMIT 10
+
+-- S-042
+%%sql
+SELECT sales_ymd, sum_amount,
+MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING) AS "d1",
+MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 2 FOLLOWING AND 2 FOLLOWING) AS "d2",
+MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 3 FOLLOWING AND 3 FOLLOWING) AS "d3"
+FROM
+(
+SELECT sales_ymd, SUM(amount) sum_amount
+FROM receipt
+GROUP BY sales_ymd
+) AS sum_amount_table
+LIMIT 10
+
+-- S-043
+%%sql
+SELECT TRUNC(age, -1) AS 年代,
+SUM(CASE WHEN gender = '男性' THEN amount ELSE 0 END) AS "0",
+SUM(CASE WHEN gender = '女性' THEN amount ELSE 0 END) AS "1",
+SUM(CASE WHEN gender = '不明' THEN amount WHEN gender IS NULL THEN amount ELSE 0 END) AS "9"
+FROM receipt FULL OUTER JOIN customer ON receipt.customer_id = customer.customer_id
+GROUP BY TRUNC(age, -1)
+ORDER BY TRUNC(age, -1)
+
+-- S-044
+%%sql
+SELECT TRUNC(age, -1) AS 年代,
+CASE WHEN gender = '男性' THEN '00' WHEN gender = '女性' THEN '01' WHEN gender = '不明' THEN '99' END AS 性別コード,
+SUM(amount)
+FROM receipt FULL OUTER JOIN customer ON receipt.customer_id = customer.customer_id
+GROUP BY TRUNC(age, -1), gender
+ORDER BY TRUNC(age, -1), 性別コード ASC
+
+-- S-045
+%%sql
+SELECT customer_id, REPLACE(CAST(birth_day as varchar), '-', '')
+FROM customer
+LIMIT 10
+
+-- S-046
+%%sql
+SELECT customer_id, CAST(application_date as date)
+FROM customer
+LIMIT 10
+
+-- S-047
+%%sql
+SELECT receipt_no, receipt_sub_no, CAST(CAST(sales_ymd as varchar) as date)
+FROM receipt
+LIMIT 10
+
+-- S-048
+%%sql
+SELECT receipt_no, receipt_sub_no, TO_TIMESTAMP(sales_epoch)
+FROM receipt
+LIMIT 10
+
+-- S-049
+%%sql
+SELECT receipt_no, receipt_sub_no, EXTRACT(year FROM TO_TIMESTAMP(sales_epoch))
+FROM receipt
+LIMIT 10
+
+-- S-050
+%%sql
+SELECT receipt_no, receipt_sub_no, SUBSTR(CAST(TO_TIMESTAMP(sales_epoch) as varchar),6 ,2)
+FROM receipt
+LIMIT 10
+
+-- S-051
+%%sql
+SELECT receipt_no, receipt_sub_no, SUBSTR(CAST(TO_TIMESTAMP(sales_epoch) as varchar),9 ,2)
+FROM receipt
+LIMIT 10
+
+-- S-052
+%%sql
+SELECT customer_id, SUM(amount), CASE WHEN SUM(amount) <= 2000 THEN 0 ELSE 1 END
+FROM (SELECT * FROM receipt WHERE customer_id !~ 'Z.*') AS mem_table
+GROUP BY customer_id
+LIMIT 10
+
+-- S-053
+%%sql
+SELECT
+SUM(CASE WHEN flag_tokyo = 1 THEN flag_purchase ELSE 0 END) AS Tokyo,
+SUM(CASE WHEN flag_tokyo = 0 THEN flag_purchase ELSE 0 END) AS Others
+FROM
+(
+SELECT
+CASE WHEN CAST(LEFT(postal_cd, 3) as integer) >= 100 THEN CASE WHEN CAST(LEFT(postal_cd, 3) as integer) <= 209 THEN 1 ELSE 0 END ELSE 0 END AS flag_tokyo,
+CASE WHEN sales_ymd IS NOT NULL THEN 1 ELSE 0 END AS flag_purchase
+FROM customer FULL OUTER JOIN receipt ON customer.customer_id = receipt.customer_id
+) AS flag_table
+
+-- S-054
+%%sql
+SELECT customer_id, address,
+CASE LEFT(address, 3)
+    WHEN '埼玉県' THEN 11
+    WHEN '千葉県' THEN 12
+    WHEN '東京都' THEN 13
+    WHEN '神奈川' THEN 14
+    ELSE 99 END
+FROM customer
+LIMIT 10
+
+-- S-055
+%%sql
+SELECT customer_id, sum_amount,
+CASE
+WHEN PERCENT_RANK() OVER (ORDER BY sum_amount) < 0.25 THEN 1
+WHEN PERCENT_RANK() OVER (ORDER BY sum_amount) < 0.5 THEN 2
+WHEN PERCENT_RANK() OVER (ORDER BY sum_amount) < 0.75 THEN 3
+WHEN PERCENT_RANK() OVER (ORDER BY sum_amount) >= 0.75 THEN 4
+ELSE 0 END
+FROM
+(
+SELECT customer_id, SUM(amount) AS sum_amount
+FROM receipt
+GROUP BY customer_id
+) AS sum_amount_table
+LIMIT 10
+
+-- S-056
+%%sql
+SELECT customer_id, birth_day,
+CASE WHEN TRUNC(age, -1) >= 60 THEN 60 ELSE TRUNC(age, -1) END AS 年代
+FROM customer
+LIMIT 10
+
+-- S-057
+%%sql
+SELECT customer_id, birth_day,
+CASE
+    WHEN gender = '女性' THEN 'F'
+    WHEN gender = '男性' THEN 'M'
+    ELSE 'U' END ||
+CASE WHEN TRUNC(age, -1) >= 60 THEN 60 ELSE TRUNC(age, -1) END AS 性別・年代
+FROM customer
+LIMIT 10
+
+-- S-058
+%%sql
+SELECT customer_id,
+CASE WHEN gender_cd = '0' THEN 1 ELSE 0 END AS 男性,
+CASE WHEN gender_cd = '1' THEN 1 ELSE 0 END AS 女性,
+CASE WHEN gender_cd = '9' THEN 1 ELSE 0 END AS 不明
+FROM customer
+LIMIT 10
+
+-- S-059
+%%sql
+WITH mem_table AS (
+SELECT customer_id, SUM(amount) AS sum_amount
+FROM receipt
+WHERE customer_id !~ 'Z.*'
+GROUP BY customer_id
+)
+SELECT customer_id, sum_amount, (sum_amount - average) / standard_dev
+FROM mem_table
+CROSS JOIN (SELECT AVG(sum_amount) AS average, STDDEV(sum_amount) AS standard_dev FROM mem_table) AS index
+LIMIT 10
+
+-- S-060
+%%sql
+WITH mem_table AS (
+SELECT customer_id, SUM(amount) AS sum_amount
+FROM receipt
+WHERE customer_id !~ 'Z.*'
+GROUP BY customer_id
+)
+SELECT customer_id, sum_amount, CAST((sum_amount - minimum) AS numeric) / CAST((maximum - minimum) AS numeric)
+FROM mem_table
+CROSS JOIN (SELECT MIN(sum_amount) AS minimum, MAX(sum_amount) AS maximum FROM mem_table) AS index
+LIMIT 10
+
+-- S-061
+%%sql
+SELECT customer_id, sum_amount, LOG(sum_amount)
+FROM
+(
+SELECT customer_id, SUM(amount) AS sum_amount
+FROM receipt
+WHERE customer_id !~ 'Z.*'
+GROUP BY customer_id
+) AS mem_table
+LIMIT 10
+
+-- S-062
+%%sql
+SELECT customer_id, sum_amount, LN(sum_amount)
+FROM
+(
+SELECT customer_id, SUM(amount) AS sum_amount
+FROM receipt
+WHERE customer_id !~ 'Z.*'
+GROUP BY customer_id
+) AS mem_table
+LIMIT 10
+
+-- S-063
+%%sql
+SELECT product_cd, unit_price - unit_cost
+FROM product
+LIMIT 10
+
+-- S-064
+%%sql
+SELECT CAST(SUM(unit_price - unit_cost) AS numeric) / CAST(SUM(unit_price) AS numeric)
+FROM product
+WHERE unit_price IS NOT NULL AND unit_cost IS NOT NULL
+
+-- S-065
+%%sql
+SELECT product_cd, TRUNC(unit_cost / 0.7, 0),
+CAST(TRUNC(unit_cost / 0.7, 0) - unit_cost AS numeric) / CAST(TRUNC(unit_cost / 0.7, 0) AS numeric)
+FROM product
+WHERE unit_cost IS NOT NULL
+LIMIT 10
+
+-- S-066
+%%sql
+SELECT product_cd, ROUND(unit_cost / 0.7, 0),
+CAST(ROUND(unit_cost / 0.7, 0) - unit_cost AS numeric) / CAST(ROUND(unit_cost / 0.7, 0) AS numeric)
+FROM product
+WHERE unit_cost IS NOT NULL
+LIMIT 10
+
+-- S-067
+%%sql
+SELECT product_cd, suggested_price,
+CAST(suggested_price - unit_cost AS numeric) / CAST(suggested_price AS numeric)
+FROM
+(
+SELECT product_cd, unit_cost,
+CASE
+    WHEN (unit_cost / 0.7) - TRUNC(unit_cost / 0.7, 0) = 0 THEN TRUNC(unit_cost / 0.7, 0)
+    ELSE TRUNC(unit_cost / 0.7, 0) + 1 END AS suggested_price
+FROM product
+WHERE unit_cost IS NOT NULL
+) AS suggested_price_table
+LIMIT 10
+
+-- S-068
+%%sql
+SELECT product_cd, TRUNC(unit_price * 1.1, 0)
+FROM product
+WHERE unit_price IS NOT NULL
+LIMIT 10
+
+-- S-069
+%%sql
+WITH cat07customer_table AS(
+SELECT customer_id, SUM(amount) AS sum_cat07
+FROM receipt LEFT OUTER JOIN product ON receipt.product_cd = product.product_cd
+WHERE category_major_cd = '07'
+GROUP BY customer_id, category_major_cd
+),
+    allcustomer_table AS(
+SELECT customer_id, SUM(amount) AS sum_all
+FROM receipt
+GROUP BY customer_id
+)
+SELECT cat07customer_table.customer_id, sum_all, sum_cat07, CAST(sum_cat07 AS numeric) / CAST(sum_all AS numeric)
+FROM cat07customer_table LEFT OUTER JOIN allcustomer_table
+ON cat07customer_table.customer_id = allcustomer_table.customer_id
+LIMIT 10
+
+-- S-070
+%%sql
+SELECT receipt.customer_id, sales_ymd, application_date,
+CAST(CAST(sales_ymd AS varchar) AS date) - CAST(application_date AS date)
+FROM receipt LEFT OUTER JOIN customer ON receipt.customer_id = customer.customer_id
+LIMIT 10
+
+-- S-071
+%%sql
+SELECT receipt.customer_id, sales_ymd, application_date,
+DATE_PART('year', AGE(CAST(CAST(sales_ymd AS varchar) AS date), CAST(application_date AS date))) * 12 +
+DATE_PART('month', AGE(CAST(CAST(sales_ymd AS varchar) AS date), CAST(application_date AS date)))
+FROM receipt LEFT OUTER JOIN customer ON receipt.customer_id = customer.customer_id
+LIMIT 10
+
+-- S-072
+%%sql
+SELECT receipt.customer_id, sales_ymd, application_date,
+DATE_PART('year', AGE(CAST(CAST(sales_ymd AS varchar) AS date), CAST(application_date AS date)))
+FROM receipt LEFT OUTER JOIN customer ON receipt.customer_id = customer.customer_id
+LIMIT 10
+
+-- S-073
+%%sql
+SELECT receipt.customer_id, sales_ymd, application_date,
+DATE_PART('epoch', AGE(CAST(CAST(sales_ymd AS varchar) AS date), CAST(application_date AS date)))
+FROM receipt LEFT OUTER JOIN customer ON receipt.customer_id = customer.customer_id
+LIMIT 10
+
+-- S-074
+%%sql
+SELECT sales_ymd, sales_ymd - DOW_num, DOW_num
+FROM(
+SELECT sales_ymd,
+CAST(
+CASE WHEN DATE_PART('dow', CAST(CAST(sales_ymd AS varchar) AS date)) = 0 THEN 7
+ELSE DATE_PART('dow', CAST(CAST(sales_ymd AS varchar) AS date)) - 1 END
+AS integer) AS DOW_num
+FROM receipt
+)dow_table
+LIMIT 10
+
+-- S-075
+%%sql
+SELECT * FROM customer
+WHERE customer_id IN (
+SELECT customer_id
+FROM(
+SELECT RANDOM() AS random_num, * FROM customer
+) AS random_num_table
+WHERE random_num >= 0.99
+)
+LIMIT 10
+
+-- S-076
+%%sql
+WITH
+randum_num_table1 AS (SELECT RANDOM() AS random_num, customer_id, gender FROM customer),
+randum_num_table2 AS (SELECT RANDOM() AS random_num, customer_id, gender FROM customer),
+randum_num_table3 AS (SELECT RANDOM() AS random_num, customer_id, gender FROM customer)
+SELECT
+SUM(CASE WHEN table1.random_num >= 0.9 AND table1.gender = '男性' THEN 1 ELSE 0 END),
+SUM(CASE WHEN table2.random_num >= 0.9 AND table2.gender = '女性' THEN 1 ELSE 0 END),
+SUM(CASE WHEN table3.random_num >= 0.9 AND table3.gender = '不明' THEN 1 ELSE 0 END)
+FROM randum_num_table1 table1
+INNER JOIN randum_num_table2 table2 ON table1.customer_id = table2.customer_id
+INNER JOIN randum_num_table3 table3 ON table1.customer_id = table3.customer_id
+
+-- S-077
+%%sql
+WITH mem_table AS
+(
+SELECT customer_id, SUM(amount) AS sum_amount FROM receipt
+WHERE customer_id !~ 'Z.*'
+GROUP BY customer_id
+)
+SELECT customer_id, sum_amount
+FROM mem_table
+CROSS JOIN (SELECT AVG(sum_amount) AS average, STDDEV(sum_amount) AS standard_dev FROM mem_table) AS index
+WHERE sum_amount >= average + 3 * standard_dev OR sum_amount <= average - 3 * standard_dev
+LIMIT 10
+
+-- S-078
+%%sql
+WITH mem_table AS
+(
+SELECT customer_id, SUM(amount) AS sum_amount FROM receipt
+WHERE customer_id !~ 'Z.*'
+GROUP BY customer_id
+)
+SELECT customer_id, sum_amount
+FROM mem_table
+CROSS JOIN (
+SELECT
+PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY sum_amount) AS Q1,
+PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY sum_amount) AS Q3
+FROM mem_table
+) AS index
+WHERE sum_amount >= (Q3 + 1.5 * (Q3 - Q1)) OR sum_amount <= (Q3 - 1.5 * (Q3 - Q1))
+LIMIT 10
+
+-- S-079
+%%sql
+SELECT
+SUM(CASE WHEN product_cd IS NULL THEN 1 ELSE 0 END) AS product_code_NULL数,
+SUM(CASE WHEN category_major_cd IS NULL THEN 1 ELSE 0 END) AS category_major_cd_NULL数,
+SUM(CASE WHEN category_medium_cd IS NULL THEN 1 ELSE 0 END) AS category_medium_cd_NULL数,
+SUM(CASE WHEN category_small_cd IS NULL THEN 1 ELSE 0 END) AS category_small_cd_NULL数,
+SUM(CASE WHEN unit_price IS NULL THEN 1 ELSE 0 END) AS unit_price_NULL数,
+SUM(CASE WHEN unit_cost IS NULL THEN 1 ELSE 0 END) AS unit_cost_NULL数
+FROM product
+
+-- S-080
+%%sql
+CREATE TABLE product_1 AS SELECT * FROM product
+
+DELETE FROM product_1
+WHERE product_cd IS NULL
+OR category_major_cd IS NULL
+OR category_medium_cd IS NULL
+OR category_small_cd IS NULL
+OR unit_price IS NULL
+OR unit_cost IS NULL
+
+SELECT COUNT(*) FROM product_1
+
+-- S-081
+%%sql
+CREATE TABLE product_2 AS SELECT * FROM product
+
+UPDATE product_2 SET
+unit_price = (SELECT ROUND(AVG(unit_price), 0) FROM product_2 WHERE unit_price IS NOT NULL)
+WHERE unit_price IS NULL
+
+UPDATE product_2 SET
+unit_cost = (SELECT ROUND(AVG(unit_cost), 0) FROM product_2 WHERE unit_cost IS NOT NULL)
+WHERE unit_cost IS NULL
+
+SELECT
+SUM(CASE WHEN unit_price IS NULL THEN 1 ELSE 0 END) AS unit_price_NULL数,
+SUM(CASE WHEN unit_cost IS NULL THEN 1 ELSE 0 END) AS unit_cost_NULL数
+FROM product_2
+
+-- S-082
+%%sql
+CREATE TABLE product_3 AS SELECT * FROM product
+
+UPDATE product_3 SET
+unit_price = (SELECT ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit_price) AS numeric), 0) FROM product_3 WHERE unit_price IS NOT NULL)
+WHERE unit_price IS NULL
+
+UPDATE product_3 SET
+unit_cost = (SELECT ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit_cost) AS numeric), 0) FROM product_3 WHERE unit_cost IS NOT NULL)
+WHERE unit_cost IS NULL
+
+SELECT
+SUM(CASE WHEN unit_price IS NULL THEN 1 ELSE 0 END) AS unit_price_NULL数,
+SUM(CASE WHEN unit_cost IS NULL THEN 1 ELSE 0 END) AS unit_cost_NULL数
+FROM product_3
+
+-- S-083
+%%sql
+CREATE TABLE product_4 AS SELECT * FROM product
+
+UPDATE product_4 SET
+unit_price = median_up_table.median_unit_price
+FROM
+(
+SELECT category_small_cd AS median_scd, ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit_price) AS numeric), 0) AS median_unit_price
+FROM product_4
+GROUP BY category_small_cd
+) AS median_up_table
+WHERE unit_price IS NULL AND category_small_cd = median_scd
+
+UPDATE product_4 SET
+unit_cost = median_uc_table.median_unit_cost
+FROM
+(
+SELECT category_small_cd AS median_scd, ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit_cost) AS numeric), 0) AS median_unit_cost
+FROM product_4
+GROUP BY category_small_cd
+) AS median_uc_table
+WHERE unit_cost IS NULL AND category_small_cd = median_scd
+
+SELECT
+SUM(CASE WHEN unit_price IS NULL THEN 1 ELSE 0 END) AS unit_price_NULL数,
+SUM(CASE WHEN unit_cost IS NULL THEN 1 ELSE 0 END) AS unit_cost_NULL数
+FROM product_4
+
+-- S-084
+%%sql
+SELECT customer.customer_id, CAST(amount_2019 AS numeric)/ CAST(sum_amount AS numeric)
+FROM customer
+INNER JOIN (
+    SELECT customer_id, SUM(amount) AS sum_amount FROM receipt GROUP BY customer_id
+) AS sum_amount_table
+ON customer.customer_id = sum_amount_table.customer_id
+INNER JOIN (
+    SELECT customer_id, SUM(amount) AS amount_2019 FROM receipt GROUP BY customer_id, LEFT(CAST(sales_ymd AS varchar), 4)
+) AS amount_2019_table
+ON customer.customer_id = amount_2019_table.customer_id
+WHERE CAST(amount_2019 AS numeric)/ CAST(sum_amount AS numeric) > 0
+LIMIT 10
+
+-- S-085
+%%sql
+CREATE TABLE customer_1 AS
+(
+SELECT
+customer_id, customer_name, gender_cd, gender, birth_day, age, customer.postal_cd, address, application_store_cd, application_date, status_cd,
+avg_longitude AS longitude, avg_latitude AS latitude
+FROM customer
+LEFT OUTER JOIN
+(
+SELECT postal_cd, AVG(longitude) AS avg_longitude, AVG(latitude) AS avg_latitude
+FROM geocode
+GROUP BY postal_cd
+) AS fixed_geocode
+ON customer.postal_cd = fixed_geocode.postal_cd
+)
+
+-- S-086
+%%sql
+SELECT customer_id, customer_1.address, store.address,
+6371 * ACOS(SIN(RADIANS(customer_1.latitude)) * SIN(RADIANS(store.latitude)) + COS(RADIANS(customer_1.latitude)) * COS(RADIANS(store.latitude)) * COS(RADIANS(customer_1.longitude) - RADIANS(store.longitude)))
+FROM customer_1
+LEFT OUTER JOIN store ON customer_1.application_store_cd = store.store_cd
+LIMIT 10
+
+-- S-087
+%%sql
+CREATE TABLE customer_u AS
+(
+SELECT
+MIN(customer_id) AS customer_id,
+sum_fixed_customer.customer_name,
+MIN(gender_cd) AS gender_cd,
+MIN(gender) AS gender,
+MIN(birth_day) AS birth_day,
+MIN(age) AS age,
+sum_fixed_customer.postal_cd,
+MIN(address) AS address,
+MIN(application_store_cd) AS application_store_cd,
+MIN(application_date) AS application_date,
+MIN(status_cd) AS status_cd,
+MIN(max_amount)
+FROM
+(
+    SELECT *
+    FROM customer
+    LEFT OUTER JOIN (SELECT customer_id AS cid, SUM(amount) AS sum_amount FROM receipt GROUP BY customer_id) AS sum_amount_table
+    ON customer.customer_id = sum_amount_table.cid
+) AS sum_fixed_customer
+LEFT OUTER JOIN
+(
+    SELECT customer_name, postal_cd, MAX(sum_amount) AS max_amount
+    FROM
+    (
+        SELECT *
+        FROM customer
+        LEFT OUTER JOIN (SELECT customer_id AS cid, SUM(amount) AS sum_amount FROM receipt GROUP BY customer_id) AS sum_amount_table
+        ON customer.customer_id = sum_amount_table.cid
+    ) AS sum_fixed_customer2
+    GROUP BY customer_name, postal_cd
+) AS max_fixed_customer
+ON sum_fixed_customer.customer_name = max_fixed_customer.customer_name
+AND sum_fixed_customer.postal_cd = max_fixed_customer.postal_cd
+WHERE sum_amount = max_amount OR sum_amount IS NULL
+GROUP BY sum_fixed_customer.customer_name, sum_fixed_customer.postal_cd
+)
+
+-- S-088
+%%sql
+CREATE TABLE customer_n AS
+(
+SELECT customer_id_n, customer_id, customer_name, gender_cd, gender, birth_day, age, customer.postal_cd, address, application_store_cd, application_date, status_cd
+FROM customer
+LEFT OUTER JOIN (SELECT customer_id AS customer_id_n, customer_name AS u_name, postal_cd AS u_pcode FROM customer_u) AS c_u
+ON customer.customer_name = u_name AND customer.postal_cd = u_pcode
+)
+
+-- S-089
+%%sql
+CREATE TABLE testtable_customer_n AS
+(
+    SELECT * FROM customer_n
+    WHERE customer_id IN
+        (
+            SELECT customer_id
+            FROM
+                (
+                    SELECT RANDOM() AS random_num, customer_id
+                    FROM customer_n
+                    WHERE customer_id IN (SELECT customer_id FROM receipt)
+                ) AS for_testtable
+            WHERE random_num < 0.2
+        )
+
+)
+
+CREATE TABLE learntable_customer_n AS
+(
+    SELECT * FROM
+    (
+        SELECT customer_id FROM customer_n WHERE customer_id IN (SELECT customer_id FROM receipt)
+    ) AS shopped_member
+    WHERE customer_id NOT IN (SELECT customer_id FROM testtable_customer_n)
+)
+
+-- S-090
+%%sql
+CREATE TABLE learntable_monthly_amount AS
+(
+SELECT sales_ym, sum_amount, test_num1, test_num2, test_num3
+FROM
+(
+    SELECT ROW_NUMBER() OVER (ORDER BY LEFT(CAST(sales_ymd AS varchar), 6)) AS row_num, LEFT(CAST(sales_ymd AS varchar), 6) AS sales_ym, SUM(amount) AS sum_amount
+    FROM receipt
+    GROUP BY LEFT(CAST(sales_ymd AS varchar), 6)
+) AS monthly_amount
+CROSS JOIN
+(
+    SELECT
+        TRUNC(CAST(RANDOM() AS numeric) * 23, 0) + 1 AS learn_num,
+        TRUNC(CAST(RANDOM() AS numeric) * 29, 0) + 1 AS test_num1,
+        TRUNC(CAST(RANDOM() AS numeric) * 29, 0) + 1 AS test_num2,
+        TRUNC(CAST(RANDOM() AS numeric) * 29, 0) + 1 AS test_num3
+)AS random_num
+WHERE row_num BETWEEN learn_num AND learn_num + 11
+)
+
+CREATE TABLE testtable1_monthly_amount AS
+(
+    SELECT sales_ym, sum_amount
+    FROM
+    (
+        SELECT ROW_NUMBER() OVER (ORDER BY LEFT(CAST(sales_ymd AS varchar), 6)) AS row_num, LEFT(CAST(sales_ymd AS varchar), 6) AS sales_ym, SUM(amount) AS sum_amount
+        FROM receipt
+        GROUP BY LEFT(CAST(sales_ymd AS varchar), 6)
+    ) AS monthly_amount
+    WHERE row_num BETWEEN (SELECT MIN(test_num1) FROM learntable_monthly_amount) AND (SELECT MIN(test_num1) FROM learntable_monthly_amount) + 5
+)
+
+CREATE TABLE testtable2_monthly_amount AS
+(
+    SELECT sales_ym, sum_amount
+    FROM
+    (
+        SELECT ROW_NUMBER() OVER (ORDER BY LEFT(CAST(sales_ymd AS varchar), 6)) AS row_num, LEFT(CAST(sales_ymd AS varchar), 6) AS sales_ym, SUM(amount) AS sum_amount
+        FROM receipt
+        GROUP BY LEFT(CAST(sales_ymd AS varchar), 6)
+    ) AS monthly_amount
+    WHERE row_num BETWEEN (SELECT MIN(test_num2) FROM learntable_monthly_amount) AND (SELECT MIN(test_num2) FROM learntable_monthly_amount) + 5
+)
+
+CREATE TABLE testtable3_monthly_amount AS
+(
+    SELECT sales_ym, sum_amount
+    FROM
+    (
+        SELECT ROW_NUMBER() OVER (ORDER BY LEFT(CAST(sales_ymd AS varchar), 6)) AS row_num, LEFT(CAST(sales_ymd AS varchar), 6) AS sales_ym, SUM(amount) AS sum_amount
+        FROM receipt
+        GROUP BY LEFT(CAST(sales_ymd AS varchar), 6)
+    ) AS monthly_amount
+    WHERE row_num BETWEEN (SELECT MIN(test_num3) FROM learntable_monthly_amount) AND (SELECT MIN(test_num3) FROM learntable_monthly_amount) + 5
+)
+
+ALTER TABLE learntable_monthly_amount DROP test_num1, DROP test_num2, DROP test_num3
+
+-- S-091
+%%sql
+WITH shopped_member_1percent AS
+(
+    SELECT customer_id
+    FROM
+    (
+        SELECT RANDOM() AS random_num1, customer_id
+        FROM customer
+        WHERE customer_id IN (SELECT customer_id FROM receipt)
+    ) AS shopped_mem
+    WHERE random_num1 > 0.99
+),
+not_shopped_member AS
+(
+    SELECT ROW_NUMBER() OVER (ORDER BY random_num2) AS row_num, customer_id
+    FROM
+    (
+    SELECT RANDOM() AS random_num2, customer_id
+    FROM customer
+    WHERE customer_id NOT IN (SELECT customer_id FROM receipt)
+    ) AS not_shopped_mem
+)
+SELECT * FROM customer
+WHERE customer_id IN (SELECT customer_id FROM shopped_member_1percent)
+OR customer_id IN
+(
+    SELECT customer_id FROM not_shopped_member
+    WHERE row_num <= (SELECT COUNT(*) FROM shopped_member_1percent)
+)
+
+-- S-092
+%%sql
+CREATE TABLE gender (
+    gender_cd integer,
+    gender char(2)
+)
+
+INSERT INTO gender VALUES (0, '男性'), (1, '女性'), (9, '不明')
+
+ALTER TABLE customer DROP COLUMN gender
+
+-- S-093
+%%sql
+/*
+CREATE TABLE product_withname AS (
+    SELECT product_cd, product.category_major_cd, category_major_name, product.category_medium_cd, category_medium_name,
+    product.category_small_cd, category_small_name, unit_price, unit_cost
+    FROM product LEFT OUTER JOIN category ON product.category_small_cd = category.category_small_cd
+)
+-- S-094
+%%sql
+COPY product_withname TO '/tmp/data/product1.csv' WITH CSV HEADER ENCODING 'UTF8' DELIMITER ','
+
+-- S-095
+%%sql
+COPY product_withname TO '/tmp/data/product2.csv' WITH CSV HEADER ENCODING 'SJIS' DELIMITER ','
+
+-- S-096
+%%sql
+COPY product_withname TO '/tmp/data/product3.csv' WITH CSV ENCODING 'UTF8' DELIMITER ','
+
+-- S-097
+%%sql
+CREATE TABLE product1 AS SELECT * FROM product_withname
+
+TRUNCATE TABLE product1
+
+COPY product1 FROM '/tmp/data/product1.csv' WITH CSV HEADER ENCODING 'UTF8' DELIMITER ','
+
+SELECT * FROM product1 LIMIT 3
+
+-- S-098
+%%sql
+CREATE TABLE product3 AS SELECT * FROM product_withname
+
+TRUNCATE TABLE product3
+
+COPY product3 FROM '/tmp/data/product3.csv' WITH CSV ENCODING 'UTF8' DELIMITER ','
+
+SELECT * FROM product3 LIMIT 3
+
+-- S-099
+%%sql
+COPY product_withname TO '/tmp/data/product4.csv' WITH CSV HEADER ENCODING 'UTF8' DELIMITER E'\t'
+
+-- S-100
+%%sql
+CREATE TABLE product4 AS SELECT * FROM product_withname
+
+TRUNCATE TABLE product4
+
+COPY product4 FROM '/tmp/data/product4.csv' WITH CSV HEADER ENCODING 'UTF8' DELIMITER E'\t'
+
+SELECT * FROM product4 LIMIT 10
