@@ -37,41 +37,41 @@ WHERE customer_id = 'CS018205000001' AND product_cd <> 'P071401019'
 
 -- S-009
 %%sql
-select * from store where not prefecture_cd = '13' and not floor_area > 900
+SELECT * FROM store where NOT prefecture_cd = '13' AND NOT floor_area > 900
 
 -- S-010
 %%sql
 SELECT * FROM store
-WHERE store_cd LIKE 'S14%'
+WHERE store_cd ~ '^S14.*'
 LIMIT 10
 
 -- S-011
 %%sql
 SELECT * FROM customer
-WHERE customer_id LIKE '%1'
+WHERE customer_id ~ '.*1$'
 LIMIT 10
 
 -- S-012
 %%sql
 SELECT * FROM store
-WHERE address LIKE '%横浜市%'
+WHERE address ~ '横浜市'
 
 -- S-013
 %%sql
 SELECT * FROM customer
-WHERE status_cd ~ '[A-F].*'
+WHERE status_cd ~ '^[A-F].*'
 LIMIT 10
 
 -- S-014
 %%sql
 SELECT * FROM customer
-WHERE status_cd ~ '.*[1-9]'
+WHERE status_cd ~ '.*[1-9]$'
 LIMIT 10
 
 -- S-015
 %%sql
 SELECT * FROM customer
-WHERE status_cd ~ '[A-F].*[1-9]'
+WHERE status_cd ~ '^[A-F].*[1-9]$'
 LIMIT 10
 
 -- S-016
@@ -94,6 +94,7 @@ LIMIT 10
 -- S-019
 %%sql
 SELECT customer_id, amount, RANK() OVER (ORDER BY amount DESC) FROM receipt
+-- 順位を飛ばさない場合はDENSE_RANKを使用する。
 LIMIT 10
 
 -- S-020
@@ -111,7 +112,7 @@ SELECT COUNT(DISTINCT customer_id) FROM receipt
 
 -- S-023
 %%sql
-SELECT store_cd, SUM(amount), SUM(quantity) FROM receipt
+SELECT store_cd, SUM(amount) AS 合計金額, SUM(quantity) AS 合計数量 FROM receipt
 GROUP BY store_cd
 
 -- S-024
@@ -142,7 +143,7 @@ LIMIT 5
 
 -- S-028
 %%sql
-SELECT store_cd, PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) FROM receipt
+SELECT store_cd, PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) AS 中央値 FROM receipt
 GROUP BY store_cd
 ORDER BY PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) DESC
 LIMIT 5
@@ -155,6 +156,7 @@ GROUP BY store_cd
 -- S-030
 %%sql
 SELECT store_cd, VAR_SAMP(amount) FROM receipt
+-- 母集団分散を計算するときはVAR_POPを使う。VARIANCEはVAR_SAMPと同様。（古いもの）
 GROUP BY store_cd
 ORDER BY VAR_SAMP(amount) DESC
 LIMIT 5
@@ -169,9 +171,9 @@ LIMIT 5
 -- S-032
 %%sql
 SELECT
-PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY amount) AS percentile_25,
-PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) AS percentile_50,
-PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY amount) AS percentile_75
+    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY amount) AS Q1,
+    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) AS Q2,
+    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY amount) AS Q3
 FROM receipt
 
 -- S-033
@@ -182,38 +184,42 @@ HAVING AVG(amount) >=330
 
 -- S-034
 %%sql
-SELECT AVG(sum_mem) FROM (
-    SELECT SUM(amount) AS sum_mem FROM receipt WHERE customer_id !~ 'Z.*' GROUP BY customer_id
+SELECT AVG(sum_amount) FROM (
+    SELECT SUM(amount) AS sum_amount FROM receipt WHERE customer_id !~ '^Z.*' GROUP BY customer_id
 ) AS member
 
 -- S-035
 %%sql
-WITH member AS (
-    SELECT customer_id, SUM(amount) AS sum_mem FROM receipt WHERE customer_id !~ 'Z.*' GROUP BY customer_id
+-- receiptから非会員を除外し、amountをcustomer_idごとに合計する。(sum_amount) WITH句にて一度保留。
+WITH member_table AS (
+    SELECT customer_id, SUM(amount) AS sum_amount FROM receipt WHERE customer_id !~ '^Z.*' GROUP BY customer_id
 )
-SELECT customer_id FROM member
-WHERE sum_mem >= (SELECT AVG(sum_mem) FROM member)
+SELECT customer_id FROM member_table
+-- AVG(sum_amount)にて全会員の合計購入金額の平均を求める。
+WHERE sum_amount >= (SELECT AVG(sum_amount) FROM member_table)
 LIMIT 10
 
 -- S-036
 %%sql
-SELECT store_name, receipt.* FROM receipt
+SELECT receipt.*, store_name FROM receipt
 INNER JOIN store ON receipt.store_cd = store.store_cd
 LIMIT 10
 
 -- S-037
 %%sql
-SELECT product.*, category_small_name FROM product
+SELECT product.*, category_small_name
+FROM product
 INNER JOIN category ON product.category_small_cd = category.category_small_cd
 LIMIT 10
 
 -- S-038
 %%sql
-SELECT customer.customer_id,
+SELECT
+    customer.customer_id,
     SUM(CASE WHEN amount IS NULL THEN 0 ELSE amount END)
 FROM customer
-LEFT JOIN receipt ON receipt.customer_id = customer.customer_id
-WHERE gender_cd = '1' AND customer.customer_id !~ 'Z.*'
+LEFT OUTER JOIN receipt ON customer.customer_id = receipt.customer_id
+WHERE gender_cd = '1' AND customer.customer_id !~ '^Z.*'
 GROUP BY customer.customer_id
 LIMIT 10
 
@@ -235,64 +241,71 @@ SELECT COUNT(*) FROM (SELECT * FROM store CROSS JOIN product) AS c_join
 
 -- S-041
 %%sql
-SELECT sales_ymd,
-sum_amount - MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING) AS amount_diff
-FROM
-(
-SELECT sales_ymd, SUM(amount) sum_amount
-FROM receipt
-GROUP BY sales_ymd
+SELECT
+    sales_ymd,
+-- ウィンドウ関数にて1日前の合計金額を取得。
+    sum_amount - MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING) AS 売上金額増減
+FROM(
+    SELECT sales_ymd, SUM(amount) sum_amount
+    FROM receipt
+    GROUP BY sales_ymd
 ) AS sum_amount_table
 LIMIT 10
 
 -- S-042
 %%sql
-SELECT sales_ymd, sum_amount,
-MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING) AS "d1",
-MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 2 FOLLOWING AND 2 FOLLOWING) AS "d2",
-MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 3 FOLLOWING AND 3 FOLLOWING) AS "d3"
-FROM
-(
-SELECT sales_ymd, SUM(amount) sum_amount
-FROM receipt
-GROUP BY sales_ymd
+SELECT
+    sales_ymd,
+    sum_amount,
+    MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING) AS "d1",
+    MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 2 FOLLOWING AND 2 FOLLOWING) AS "d2",
+    MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 3 FOLLOWING AND 3 FOLLOWING) AS "d3"
+FROM (
+    SELECT sales_ymd, SUM(amount) AS sum_amount
+    FROM receipt
+    GROUP BY sales_ymd
 ) AS sum_amount_table
 LIMIT 10
 
 -- S-043
 %%sql
-SELECT TRUNC(age, -1) AS 年代,
-SUM(CASE WHEN gender = '男性' THEN amount ELSE 0 END) AS "0",
-SUM(CASE WHEN gender = '女性' THEN amount ELSE 0 END) AS "1",
-SUM(CASE WHEN gender = '不明' THEN amount WHEN gender IS NULL THEN amount ELSE 0 END) AS "9"
+SELECT
+    TRUNC(age, -1) AS 年代,
+    SUM(CASE WHEN gender = '男性' THEN amount ELSE 0 END) AS "0",
+    SUM(CASE WHEN gender = '女性' THEN amount ELSE 0 END) AS "1",
+-- NULLを拾う。
+    SUM(CASE WHEN gender = '不明' THEN amount WHEN gender IS NULL THEN amount ELSE 0 END) AS "9"
 FROM receipt FULL OUTER JOIN customer ON receipt.customer_id = customer.customer_id
 GROUP BY TRUNC(age, -1)
 ORDER BY TRUNC(age, -1)
 
 -- S-044
 %%sql
-SELECT TRUNC(age, -1) AS 年代,
-CASE WHEN gender = '男性' THEN '00' WHEN gender = '女性' THEN '01' WHEN gender = '不明' THEN '99' END AS 性別コード,
-SUM(amount)
+SELECT
+    TRUNC(age, -1) AS 年代,
+    CASE WHEN gender = '男性' THEN '00' WHEN gender = '女性' THEN '01' WHEN gender = '不明' THEN '99' ELSE NULL END AS 性別コード,
+    SUM(amount)
 FROM receipt FULL OUTER JOIN customer ON receipt.customer_id = customer.customer_id
 GROUP BY TRUNC(age, -1), gender
 ORDER BY TRUNC(age, -1), 性別コード ASC
 
 -- S-045
 %%sql
-SELECT customer_id, REPLACE(CAST(birth_day as varchar), '-', '')
+SELECT customer_id, REPLACE(CAST(birth_day AS varchar), '-', '')  AS birth_day
 FROM customer
 LIMIT 10
 
 -- S-046
 %%sql
-SELECT customer_id, CAST(application_date as date)
+SELECT customer_id, CAST(application_date AS date)
 FROM customer
 LIMIT 10
 
 -- S-047
 %%sql
-SELECT receipt_no, receipt_sub_no, CAST(CAST(sales_ymd as varchar) as date)
+%%sql
+SELECT receipt_no, receipt_sub_no, CAST(CAST(sales_ymd AS varchar) AS date)
+-- integerから直接dateには出来ないよう。
 FROM receipt
 LIMIT 10
 
@@ -310,7 +323,7 @@ LIMIT 10
 
 -- S-050
 %%sql
-SELECT receipt_no, receipt_sub_no, SUBSTR(CAST(TO_TIMESTAMP(sales_epoch) as varchar),6 ,2)
+SELECT receipt_no, receipt_sub_no, SUBSTR(CAST(TO_TIMESTAMP(sales_epoch) AS varchar),6 ,2)
 FROM receipt
 LIMIT 10
 
