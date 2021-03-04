@@ -317,13 +317,13 @@ LIMIT 10
 
 -- S-049
 %%sql
-SELECT receipt_no, receipt_sub_no, EXTRACT(year FROM TO_TIMESTAMP(sales_epoch))
+SELECT receipt_no, receipt_sub_no, CAST(EXTRACT(year FROM TO_TIMESTAMP(sales_epoch)) AS integer) AS 年
 FROM receipt
 LIMIT 10
 
 -- S-050
 %%sql
-SELECT receipt_no, receipt_sub_no, SUBSTR(CAST(TO_TIMESTAMP(sales_epoch) AS varchar),6 ,2)
+SELECT receipt_no, receipt_sub_no, SUBSTR(CAST(TO_TIMESTAMP(sales_epoch) AS varchar),6 ,2) AS 月
 FROM receipt
 LIMIT 10
 
