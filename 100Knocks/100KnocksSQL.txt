@@ -329,108 +329,112 @@ LIMIT 10
 
 -- S-051
 %%sql
-SELECT receipt_no, receipt_sub_no, SUBSTR(CAST(TO_TIMESTAMP(sales_epoch) as varchar),9 ,2)
+SELECT receipt_no, receipt_sub_no, SUBSTR(CAST(TO_TIMESTAMP(sales_epoch) AS varchar),9 ,2) AS 日
 FROM receipt
 LIMIT 10
 
 -- S-052
 %%sql
 SELECT customer_id, SUM(amount), CASE WHEN SUM(amount) <= 2000 THEN 0 ELSE 1 END
-FROM (SELECT * FROM receipt WHERE customer_id !~ 'Z.*') AS mem_table
+FROM (SELECT * FROM receipt WHERE customer_id !~ '^Z.*') AS mem_table
 GROUP BY customer_id
 LIMIT 10
 
 -- S-053
 %%sql
 SELECT
-SUM(CASE WHEN flag_tokyo = 1 THEN flag_purchase ELSE 0 END) AS Tokyo,
-SUM(CASE WHEN flag_tokyo = 0 THEN flag_purchase ELSE 0 END) AS Others
-FROM
-(
+    SUM(CASE WHEN flag_tokyo = 1 THEN flag_purchase ELSE 0 END) AS Tokyo,
+    SUM(CASE WHEN flag_tokyo = 0 THEN flag_purchase ELSE 0 END) AS Others
+FROM(
+-- 郵便番号が100〜209の間かどうか(flag_tokyo)、およびsales_ymdがNULLかどうか(flag_purchase)を判定。
 SELECT
-CASE WHEN CAST(LEFT(postal_cd, 3) as integer) >= 100 THEN CASE WHEN CAST(LEFT(postal_cd, 3) as integer) <= 209 THEN 1 ELSE 0 END ELSE 0 END AS flag_tokyo,
-CASE WHEN sales_ymd IS NOT NULL THEN 1 ELSE 0 END AS flag_purchase
-FROM customer FULL OUTER JOIN receipt ON customer.customer_id = receipt.customer_id
+    CASE WHEN CAST(LEFT(postal_cd, 3) AS integer) >= 100 THEN CASE WHEN CAST(LEFT(postal_cd, 3) AS integer) <= 209 THEN 1 ELSE 0 END ELSE 0 END AS flag_tokyo,
+    CASE WHEN sales_ymd IS NOT NULL THEN 1 ELSE 0 END AS flag_purchase
+    FROM customer FULL OUTER JOIN receipt ON customer.customer_id = receipt.customer_id
 ) AS flag_table
 
 -- S-054
 %%sql
 SELECT customer_id, address,
-CASE LEFT(address, 3)
-    WHEN '埼玉県' THEN 11
-    WHEN '千葉県' THEN 12
-    WHEN '東京都' THEN 13
-    WHEN '神奈川' THEN 14
-    ELSE 99 END
+    CASE LEFT(address, 3)
+        WHEN '埼玉県' THEN 11
+        WHEN '千葉県' THEN 12
+        WHEN '東京都' THEN 13
+        WHEN '神奈川' THEN 14
+    ELSE 99 END AS 都道府県コード
 FROM customer
 LIMIT 10
 
 -- S-055
 %%sql
 SELECT customer_id, sum_amount,
-CASE
-WHEN PERCENT_RANK() OVER (ORDER BY sum_amount) < 0.25 THEN 1
-WHEN PERCENT_RANK() OVER (ORDER BY sum_amount) < 0.5 THEN 2
-WHEN PERCENT_RANK() OVER (ORDER BY sum_amount) < 0.75 THEN 3
-WHEN PERCENT_RANK() OVER (ORDER BY sum_amount) >= 0.75 THEN 4
-ELSE 0 END
-FROM
-(
-SELECT customer_id, SUM(amount) AS sum_amount
-FROM receipt
-GROUP BY customer_id
+    CASE
+        WHEN PERCENT_RANK() OVER (ORDER BY sum_amount) < 0.25 THEN 1
+        WHEN PERCENT_RANK() OVER (ORDER BY sum_amount) < 0.5 THEN 2
+        WHEN PERCENT_RANK() OVER (ORDER BY sum_amount) < 0.75 THEN 3
+        WHEN PERCENT_RANK() OVER (ORDER BY sum_amount) >= 0.75 THEN 4
+    ELSE 0 END AS カテゴリ値
+FROM (
+    SELECT customer_id, SUM(amount) AS sum_amount
+    FROM receipt
+    GROUP BY customer_id
 ) AS sum_amount_table
 LIMIT 10
 
 -- S-056
 %%sql
 SELECT customer_id, birth_day,
-CASE WHEN TRUNC(age, -1) >= 60 THEN 60 ELSE TRUNC(age, -1) END AS 年代
+CASE WHEN age >= 60 THEN 60 ELSE TRUNC(age, -1) END AS 年代
 FROM customer
 LIMIT 10
 
 -- S-057
 %%sql
 SELECT customer_id, birth_day,
-CASE
-    WHEN gender = '女性' THEN 'F'
-    WHEN gender = '男性' THEN 'M'
+    CASE
+        WHEN gender = '女性' THEN 'F'
+        WHEN gender = '男性' THEN 'M'
     ELSE 'U' END ||
-CASE WHEN TRUNC(age, -1) >= 60 THEN 60 ELSE TRUNC(age, -1) END AS 性別・年代
+    CASE WHEN age >= 60 THEN 60
+    ELSE TRUNC(age, -1) END AS 性別・年代
 FROM customer
 LIMIT 10
 
 -- S-058
 %%sql
 SELECT customer_id,
-CASE WHEN gender_cd = '0' THEN 1 ELSE 0 END AS 男性,
-CASE WHEN gender_cd = '1' THEN 1 ELSE 0 END AS 女性,
-CASE WHEN gender_cd = '9' THEN 1 ELSE 0 END AS 不明
+    CASE WHEN gender_cd = '0' THEN 1 ELSE 0 END AS 男性,
+    CASE WHEN gender_cd = '1' THEN 1 ELSE 0 END AS 女性,
+    CASE WHEN gender_cd = '9' THEN 1 ELSE 0 END AS 不明
 FROM customer
 LIMIT 10
 
 -- S-059
 %%sql
+-- 会員の合計金額テーブルを先に作成。
 WITH mem_table AS (
-SELECT customer_id, SUM(amount) AS sum_amount
-FROM receipt
-WHERE customer_id !~ 'Z.*'
-GROUP BY customer_id
+    SELECT customer_id, SUM(amount) AS sum_amount
+    FROM receipt
+    WHERE customer_id !~ '^Z.*'
+    GROUP BY customer_id
 )
-SELECT customer_id, sum_amount, (sum_amount - average) / standard_dev
+SELECT customer_id, sum_amount, (sum_amount - average) / standard_dev AS 標準得点
+-- 統計における標準化の一般式は、(元の値 - 平均値) / 標準偏差
 FROM mem_table
+-- 計算に利用するため、平均値・標準偏差をCROSS JOINでテーブルに付与
 CROSS JOIN (SELECT AVG(sum_amount) AS average, STDDEV(sum_amount) AS standard_dev FROM mem_table) AS index
 LIMIT 10
 
 -- S-060
 %%sql
 WITH mem_table AS (
-SELECT customer_id, SUM(amount) AS sum_amount
-FROM receipt
-WHERE customer_id !~ 'Z.*'
-GROUP BY customer_id
+    SELECT customer_id, SUM(amount) AS sum_amount
+    FROM receipt
+    WHERE customer_id !~ '^Z.*'
+    GROUP BY customer_id
 )
-SELECT customer_id, sum_amount, CAST((sum_amount - minimum) AS numeric) / CAST((maximum - minimum) AS numeric)
+SELECT customer_id, sum_amount, CAST((sum_amount - minimum) AS numeric) / CAST((maximum - minimum) AS numeric) AS 正規化点数
+-- integerからnumeric等へデータ型の変換が必要。
 FROM mem_table
 CROSS JOIN (SELECT MIN(sum_amount) AS minimum, MAX(sum_amount) AS maximum FROM mem_table) AS index
 LIMIT 10
@@ -438,67 +442,71 @@ LIMIT 10
 -- S-061
 %%sql
 SELECT customer_id, sum_amount, LOG(sum_amount)
-FROM
-(
-SELECT customer_id, SUM(amount) AS sum_amount
-FROM receipt
-WHERE customer_id !~ 'Z.*'
-GROUP BY customer_id
+FROM (
+    SELECT customer_id, SUM(amount) AS sum_amount
+    FROM receipt
+    WHERE customer_id !~ '^Z.*'
+    GROUP BY customer_id
 ) AS mem_table
 LIMIT 10
 
 -- S-062
 %%sql
 SELECT customer_id, sum_amount, LN(sum_amount)
-FROM
-(
-SELECT customer_id, SUM(amount) AS sum_amount
-FROM receipt
-WHERE customer_id !~ 'Z.*'
-GROUP BY customer_id
+FROM (
+    SELECT customer_id, SUM(amount) AS sum_amount
+    FROM receipt
+    WHERE customer_id !~ '^Z.*'
+    GROUP BY customer_id
 ) AS mem_table
 LIMIT 10
 
 -- S-063
 %%sql
-SELECT product_cd, unit_price - unit_cost
+SELECT product_cd, unit_price - unit_cost AS 利益額
 FROM product
 LIMIT 10
 
 -- S-064
 %%sql
-SELECT CAST(SUM(unit_price - unit_cost) AS numeric) / CAST(SUM(unit_price) AS numeric)
+SELECT CAST(SUM(unit_price - unit_cost) AS numeric) / CAST(SUM(unit_price) AS numeric) AS 平均利益率
 FROM product
 WHERE unit_price IS NOT NULL AND unit_cost IS NOT NULL
 
 -- S-065
 %%sql
-SELECT product_cd, TRUNC(unit_cost / 0.7, 0),
-CAST(TRUNC(unit_cost / 0.7, 0) - unit_cost AS numeric) / CAST(TRUNC(unit_cost / 0.7, 0) AS numeric)
+SELECT
+    product_cd,
+    TRUNC(unit_cost / 0.7, 0) AS 想定単価,
+    CAST(TRUNC(unit_cost / 0.7, 0) - unit_cost AS numeric) / CAST(TRUNC(unit_cost / 0.7, 0) AS numeric) AS 想定利益率
 FROM product
 WHERE unit_cost IS NOT NULL
 LIMIT 10
 
 -- S-066
 %%sql
-SELECT product_cd, ROUND(unit_cost / 0.7, 0),
-CAST(ROUND(unit_cost / 0.7, 0) - unit_cost AS numeric) / CAST(ROUND(unit_cost / 0.7, 0) AS numeric)
+SELECT
+    product_cd,
+    ROUND(unit_cost / 0.7, 0) AS 想定単価,
+    CAST(ROUND(unit_cost / 0.7, 0) - unit_cost AS numeric) / CAST(ROUND(unit_cost / 0.7, 0) AS numeric) AS 想定利益率
 FROM product
 WHERE unit_cost IS NOT NULL
 LIMIT 10
 
 -- S-067
 %%sql
-SELECT product_cd, suggested_price,
-CAST(suggested_price - unit_cost AS numeric) / CAST(suggested_price AS numeric)
-FROM
-(
-SELECT product_cd, unit_cost,
-CASE
-    WHEN (unit_cost / 0.7) - TRUNC(unit_cost / 0.7, 0) = 0 THEN TRUNC(unit_cost / 0.7, 0)
-    ELSE TRUNC(unit_cost / 0.7, 0) + 1 END AS suggested_price
-FROM product
-WHERE unit_cost IS NOT NULL
+SELECT
+    product_cd,
+    suggested_price AS 想定単価,
+    CAST(suggested_price - unit_cost AS numeric) / CAST(suggested_price AS numeric) AS 想定利益率
+FROM (
+    SELECT product_cd, unit_cost,
+    -- 小数点以下が0の場合のみ切り上げなし、それ以外は切り捨て後に+1することで切り上げを実装。
+        CASE
+            WHEN (unit_cost / 0.7) - TRUNC(unit_cost / 0.7, 0) = 0 THEN TRUNC(unit_cost / 0.7, 0)
+        ELSE TRUNC(unit_cost / 0.7, 0) + 1 END AS suggested_price
+    FROM product
+    WHERE unit_cost IS NOT NULL
 ) AS suggested_price_table
 LIMIT 10
 
@@ -511,18 +519,19 @@ LIMIT 10
 
 -- S-069
 %%sql
+-- 先にWITH句にてカテゴリ07の合計金額と全体の合計金額を用意する。
 WITH cat07customer_table AS(
-SELECT customer_id, SUM(amount) AS sum_cat07
-FROM receipt LEFT OUTER JOIN product ON receipt.product_cd = product.product_cd
-WHERE category_major_cd = '07'
-GROUP BY customer_id, category_major_cd
+        SELECT customer_id, SUM(amount) AS sum_cat07
+        FROM receipt LEFT OUTER JOIN product ON receipt.product_cd = product.product_cd
+        WHERE category_major_cd = '07'
+        GROUP BY customer_id, category_major_cd
 ),
     allcustomer_table AS(
-SELECT customer_id, SUM(amount) AS sum_all
-FROM receipt
-GROUP BY customer_id
+        SELECT customer_id, SUM(amount) AS sum_all
+        FROM receipt
+        GROUP BY customer_id
 )
-SELECT cat07customer_table.customer_id, sum_all, sum_cat07, CAST(sum_cat07 AS numeric) / CAST(sum_all AS numeric)
+SELECT cat07customer_table.customer_id, sum_all, sum_cat07, CAST(sum_cat07 AS numeric) / CAST(sum_all AS numeric) AS "07_瓶詰缶詰の割合"
 FROM cat07customer_table LEFT OUTER JOIN allcustomer_table
 ON cat07customer_table.customer_id = allcustomer_table.customer_id
 LIMIT 10
@@ -530,54 +539,57 @@ LIMIT 10
 -- S-070
 %%sql
 SELECT receipt.customer_id, sales_ymd, application_date,
-CAST(CAST(sales_ymd AS varchar) AS date) - CAST(application_date AS date)
+    CAST(CAST(sales_ymd AS varchar) AS date) - CAST(application_date AS date) AS 経過日数
 FROM receipt LEFT OUTER JOIN customer ON receipt.customer_id = customer.customer_id
 LIMIT 10
 
 -- S-071
 %%sql
 SELECT receipt.customer_id, sales_ymd, application_date,
-DATE_PART('year', AGE(CAST(CAST(sales_ymd AS varchar) AS date), CAST(application_date AS date))) * 12 +
-DATE_PART('month', AGE(CAST(CAST(sales_ymd AS varchar) AS date), CAST(application_date AS date)))
+    --DATE_PARTの年数差*12したものにDATE_PARTの月数差を加え、経過月数を計算する。
+    DATE_PART('year', AGE(CAST(CAST(sales_ymd AS varchar) AS date), CAST(application_date AS date))) * 12
+    + DATE_PART('month', AGE(CAST(CAST(sales_ymd AS varchar) AS date), CAST(application_date AS date))) AS 経過月数
 FROM receipt LEFT OUTER JOIN customer ON receipt.customer_id = customer.customer_id
 LIMIT 10
 
 -- S-072
 %%sql
 SELECT receipt.customer_id, sales_ymd, application_date,
-DATE_PART('year', AGE(CAST(CAST(sales_ymd AS varchar) AS date), CAST(application_date AS date)))
+    DATE_PART('year', AGE(CAST(CAST(sales_ymd AS varchar) AS date), CAST(application_date AS date))) AS 経過年数
 FROM receipt LEFT OUTER JOIN customer ON receipt.customer_id = customer.customer_id
 LIMIT 10
 
 -- S-073
 %%sql
 SELECT receipt.customer_id, sales_ymd, application_date,
-DATE_PART('epoch', AGE(CAST(CAST(sales_ymd AS varchar) AS date), CAST(application_date AS date)))
+    DATE_PART('epoch', AGE(CAST(CAST(sales_ymd AS varchar) AS date), CAST(application_date AS date))) AS 経過時間（エポック秒）
 FROM receipt LEFT OUTER JOIN customer ON receipt.customer_id = customer.customer_id
 LIMIT 10
 
 -- S-074
 %%sql
-SELECT sales_ymd, sales_ymd - DOW_num, DOW_num
-FROM(
-SELECT sales_ymd,
-CAST(
-CASE WHEN DATE_PART('dow', CAST(CAST(sales_ymd AS varchar) AS date)) = 0 THEN 7
-ELSE DATE_PART('dow', CAST(CAST(sales_ymd AS varchar) AS date)) - 1 END
-AS integer) AS DOW_num
-FROM receipt
-)dow_table
+SELECT sales_ymd, sales_ymd - DOW_num AS 購入した週の月曜日, DOW_num AS 経過日数
+FROM (
+    SELECT sales_ymd,
+    -- DATE_PARTのdowは日曜起点のため、日曜は+7, その他は-1することで月曜起点に変換。また、varcharで出力される？のでintegerに変換。
+        CAST(
+            CASE WHEN DATE_PART('dow', CAST(CAST(sales_ymd AS varchar) AS date)) = 0 THEN 7
+            ELSE DATE_PART('dow', CAST(CAST(sales_ymd AS varchar) AS date)) - 1 END
+            AS integer
+        ) AS DOW_num
+    FROM receipt
+    ) AS dow_table
 LIMIT 10
 
 -- S-075
 %%sql
 SELECT * FROM customer
 WHERE customer_id IN (
-SELECT customer_id
-FROM(
-SELECT RANDOM() AS random_num, * FROM customer
-) AS random_num_table
-WHERE random_num >= 0.99
+    SELECT customer_id
+    FROM (
+        SELECT RANDOM() AS random_num, * FROM customer
+    ) AS random_num_table
+    WHERE random_num >= 0.99
 )
 LIMIT 10
 
