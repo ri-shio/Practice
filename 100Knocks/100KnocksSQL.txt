@@ -226,10 +226,10 @@ LIMIT 10
 -- S-039
 %%sql
 WITH freq20_mem AS (
-    SELECT customer_id FROM receipt WHERE customer_id !~ 'Z.*' GROUP BY customer_id ORDER BY COUNT(sales_ymd) DESC LIMIT 20
+    SELECT customer_id FROM receipt WHERE customer_id !~ '^Z.*' GROUP BY customer_id ORDER BY COUNT(sales_ymd) DESC LIMIT 20
 ),
      high20_mem AS (
-SELECT customer_id FROM receipt WHERE customer_id !~ 'Z.*' GROUP BY customer_id ORDER BY SUM(amount) DESC LIMIT 20
+SELECT customer_id FROM receipt WHERE customer_id !~ '^Z.*' GROUP BY customer_id ORDER BY SUM(amount) DESC LIMIT 20
 )
 
 SELECT freq20_mem.customer_id AS freq_20, high20_mem.customer_id AS high_20
@@ -271,10 +271,10 @@ LIMIT 10
 %%sql
 SELECT
     TRUNC(age, -1) AS 年代,
-    SUM(CASE WHEN gender = '男性' THEN amount ELSE 0 END) AS "0",
-    SUM(CASE WHEN gender = '女性' THEN amount ELSE 0 END) AS "1",
+    SUM(CASE WHEN gender_cd = '0' THEN amount ELSE 0 END) AS "0",
+    SUM(CASE WHEN gender_cd = '1' THEN amount ELSE 0 END) AS "1",
 -- NULLを拾う。
-    SUM(CASE WHEN gender = '不明' THEN amount WHEN gender IS NULL THEN amount ELSE 0 END) AS "9"
+    SUM(CASE WHEN gender_cd = '9' THEN amount WHEN gender_cd IS NULL THEN amount ELSE 0 END) AS "9"
 FROM receipt FULL OUTER JOIN customer ON receipt.customer_id = customer.customer_id
 GROUP BY TRUNC(age, -1)
 ORDER BY TRUNC(age, -1)
@@ -283,10 +283,10 @@ ORDER BY TRUNC(age, -1)
 %%sql
 SELECT
     TRUNC(age, -1) AS 年代,
-    CASE WHEN gender = '男性' THEN '00' WHEN gender = '女性' THEN '01' WHEN gender = '不明' THEN '99' ELSE NULL END AS 性別コード,
+    CASE WHEN gender_cd = '0' THEN '00' WHEN gender_cd = '1' THEN '01' WHEN gender_cd = '9' THEN '99' ELSE NULL END AS 性別コード,
     SUM(amount)
 FROM receipt FULL OUTER JOIN customer ON receipt.customer_id = customer.customer_id
-GROUP BY TRUNC(age, -1), gender
+GROUP BY TRUNC(age, -1), gender_cd
 ORDER BY TRUNC(age, -1), 性別コード ASC
 
 -- S-045
@@ -384,7 +384,7 @@ LIMIT 10
 -- S-056
 %%sql
 SELECT customer_id, birth_day,
-CASE WHEN age >= 60 THEN 60 ELSE TRUNC(age, -1) END AS 年代
+    CASE WHEN age >= 60 THEN 60 ELSE TRUNC(age, -1) END AS 年代
 FROM customer
 LIMIT 10
 
@@ -392,8 +392,8 @@ LIMIT 10
 %%sql
 SELECT customer_id, birth_day,
     CASE
-        WHEN gender = '女性' THEN 'F'
-        WHEN gender = '男性' THEN 'M'
+        WHEN gender_cd = '0' THEN 'M'
+        WHEN gender_cd = '1' THEN 'F'
     ELSE 'U' END ||
     CASE WHEN age >= 60 THEN 60
     ELSE TRUNC(age, -1) END AS 性別・年代
