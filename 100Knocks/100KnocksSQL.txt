@@ -595,25 +595,27 @@ LIMIT 10
 
 -- S-076
 %%sql
+%%sql
+-- あらかじめRANDOMを持つテーブルを3つ用意する。
 WITH
-randum_num_table1 AS (SELECT RANDOM() AS random_num, customer_id, gender FROM customer),
-randum_num_table2 AS (SELECT RANDOM() AS random_num, customer_id, gender FROM customer),
-randum_num_table3 AS (SELECT RANDOM() AS random_num, customer_id, gender FROM customer)
+    randum_num_table1 AS (SELECT RANDOM() AS random_num, customer_id, gender_cd FROM customer),
+    randum_num_table2 AS (SELECT RANDOM() AS random_num, customer_id, gender_cd FROM customer),
+    randum_num_table3 AS (SELECT RANDOM() AS random_num, customer_id, gender_cd FROM customer)
 SELECT
-SUM(CASE WHEN table1.random_num >= 0.9 AND table1.gender = '男性' THEN 1 ELSE 0 END),
-SUM(CASE WHEN table2.random_num >= 0.9 AND table2.gender = '女性' THEN 1 ELSE 0 END),
-SUM(CASE WHEN table3.random_num >= 0.9 AND table3.gender = '不明' THEN 1 ELSE 0 END)
+    SUM(CASE WHEN table1.random_num >= 0.9 AND table1.gender_cd = '0' THEN 1 ELSE 0 END) AS "男性_10%",
+    SUM(CASE WHEN table2.random_num >= 0.9 AND table2.gender_cd = '1' THEN 1 ELSE 0 END) AS "女性_10%",
+    SUM(CASE WHEN table3.random_num >= 0.9 AND table3.gender_cd = '9' THEN 1 ELSE 0 END) AS "不明_10%"
 FROM randum_num_table1 table1
 INNER JOIN randum_num_table2 table2 ON table1.customer_id = table2.customer_id
 INNER JOIN randum_num_table3 table3 ON table1.customer_id = table3.customer_id
 
 -- S-077
 %%sql
-WITH mem_table AS
-(
-SELECT customer_id, SUM(amount) AS sum_amount FROM receipt
-WHERE customer_id !~ 'Z.*'
-GROUP BY customer_id
+%%sql
+WITH mem_table AS (
+    SELECT customer_id, SUM(amount) AS sum_amount FROM receipt
+    WHERE customer_id !~ '^Z.*'
+    GROUP BY customer_id
 )
 SELECT customer_id, sum_amount
 FROM mem_table
@@ -623,19 +625,18 @@ LIMIT 10
 
 -- S-078
 %%sql
-WITH mem_table AS
-(
-SELECT customer_id, SUM(amount) AS sum_amount FROM receipt
-WHERE customer_id !~ 'Z.*'
-GROUP BY customer_id
+WITH mem_table AS (
+    SELECT customer_id, SUM(amount) AS sum_amount FROM receipt
+    WHERE customer_id !~ '^Z.*'
+    GROUP BY customer_id
 )
 SELECT customer_id, sum_amount
 FROM mem_table
 CROSS JOIN (
-SELECT
-PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY sum_amount) AS Q1,
-PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY sum_amount) AS Q3
-FROM mem_table
+    SELECT
+        PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY sum_amount) AS Q1,
+        PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY sum_amount) AS Q3
+    FROM mem_table
 ) AS index
 WHERE sum_amount >= (Q3 + 1.5 * (Q3 - Q1)) OR sum_amount <= (Q3 - 1.5 * (Q3 - Q1))
 LIMIT 10
@@ -643,206 +644,236 @@ LIMIT 10
 -- S-079
 %%sql
 SELECT
-SUM(CASE WHEN product_cd IS NULL THEN 1 ELSE 0 END) AS product_code_NULL数,
-SUM(CASE WHEN category_major_cd IS NULL THEN 1 ELSE 0 END) AS category_major_cd_NULL数,
-SUM(CASE WHEN category_medium_cd IS NULL THEN 1 ELSE 0 END) AS category_medium_cd_NULL数,
-SUM(CASE WHEN category_small_cd IS NULL THEN 1 ELSE 0 END) AS category_small_cd_NULL数,
-SUM(CASE WHEN unit_price IS NULL THEN 1 ELSE 0 END) AS unit_price_NULL数,
-SUM(CASE WHEN unit_cost IS NULL THEN 1 ELSE 0 END) AS unit_cost_NULL数
+    SUM(CASE WHEN product_cd IS NULL THEN 1 ELSE 0 END) AS product_code_NULL数,
+    SUM(CASE WHEN category_major_cd IS NULL THEN 1 ELSE 0 END) AS category_major_cd_NULL数,
+    SUM(CASE WHEN category_medium_cd IS NULL THEN 1 ELSE 0 END) AS category_medium_cd_NULL数,
+    SUM(CASE WHEN category_small_cd IS NULL THEN 1 ELSE 0 END) AS category_small_cd_NULL数,
+    SUM(CASE WHEN unit_price IS NULL THEN 1 ELSE 0 END) AS unit_price_NULL数,
+    SUM(CASE WHEN unit_cost IS NULL THEN 1 ELSE 0 END) AS unit_cost_NULL数
 FROM product
 
 -- S-080
 %%sql
+-- 1. productの複製テーブルを作成
 CREATE TABLE product_1 AS SELECT * FROM product
 
+-- 2. COUNTでレコード数を確認。
+SELECT COUNT(*) FROM product_1
+
+-- 3. いずれかのフィールドがNULLのレコードを削除
 DELETE FROM product_1
 WHERE product_cd IS NULL
-OR category_major_cd IS NULL
-OR category_medium_cd IS NULL
-OR category_small_cd IS NULL
-OR unit_price IS NULL
-OR unit_cost IS NULL
+    OR category_major_cd IS NULL
+    OR category_medium_cd IS NULL
+    OR category_small_cd IS NULL
+    OR unit_price IS NULL
+    OR unit_cost IS NULL
 
+-- 4. COUNTでレコード数の変化を確認。
 SELECT COUNT(*) FROM product_1
 
 -- S-081
 %%sql
+-- 1. productの複製テーブルを作成
 CREATE TABLE product_2 AS SELECT * FROM product
 
+-- 2. unit_priceがNULLのフィールドに平均値を挿入。
 UPDATE product_2 SET
-unit_price = (SELECT ROUND(AVG(unit_price), 0) FROM product_2 WHERE unit_price IS NOT NULL)
+    unit_price = (SELECT ROUND(AVG(unit_price), 0) FROM product_2 WHERE unit_price IS NOT NULL)
 WHERE unit_price IS NULL
 
+-- 3. unit_costも同様。
 UPDATE product_2 SET
-unit_cost = (SELECT ROUND(AVG(unit_cost), 0) FROM product_2 WHERE unit_cost IS NOT NULL)
+    unit_cost = (SELECT ROUND(AVG(unit_cost), 0) FROM product_2 WHERE unit_cost IS NOT NULL)
 WHERE unit_cost IS NULL
 
+-- 4. 2つのカラムにNULLが無いことを確認。
 SELECT
-SUM(CASE WHEN unit_price IS NULL THEN 1 ELSE 0 END) AS unit_price_NULL数,
-SUM(CASE WHEN unit_cost IS NULL THEN 1 ELSE 0 END) AS unit_cost_NULL数
+    SUM(CASE WHEN unit_price IS NULL THEN 1 ELSE 0 END) AS unit_price_NULL数,
+    SUM(CASE WHEN unit_cost IS NULL THEN 1 ELSE 0 END) AS unit_cost_NULL数
 FROM product_2
 
 -- S-082
 %%sql
+-- 1. productの複製テーブルを作成
 CREATE TABLE product_3 AS SELECT * FROM product
 
+-- 2. unit_priceがNULLのフィールドに中央値を挿入。
 UPDATE product_3 SET
-unit_price = (SELECT ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit_price) AS numeric), 0) FROM product_3 WHERE unit_price IS NOT NULL)
+    unit_price = (SELECT ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit_price) AS numeric), 0) FROM product_3 WHERE unit_price IS NOT NULL)
 WHERE unit_price IS NULL
 
+-- 3. unit_costも同様。
 UPDATE product_3 SET
-unit_cost = (SELECT ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit_cost) AS numeric), 0) FROM product_3 WHERE unit_cost IS NOT NULL)
+    unit_cost = (SELECT ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit_cost) AS numeric), 0) FROM product_3 WHERE unit_cost IS NOT NULL)
 WHERE unit_cost IS NULL
 
+-- 4. 2つのカラムにNULLが無いことを確認。
 SELECT
-SUM(CASE WHEN unit_price IS NULL THEN 1 ELSE 0 END) AS unit_price_NULL数,
-SUM(CASE WHEN unit_cost IS NULL THEN 1 ELSE 0 END) AS unit_cost_NULL数
+    SUM(CASE WHEN unit_price IS NULL THEN 1 ELSE 0 END) AS unit_price_NULL数,
+    SUM(CASE WHEN unit_cost IS NULL THEN 1 ELSE 0 END) AS unit_cost_NULL数
 FROM product_3
 
 -- S-083
 %%sql
+-- 1. productの複製テーブルを作成
 CREATE TABLE product_4 AS SELECT * FROM product
 
+-- 2. unit_priceがNULLのフィールドに小カテゴリの中央値を挿入。小カテゴリの中央値はサブクエリにて算出する。
 UPDATE product_4 SET
 unit_price = median_up_table.median_unit_price
-FROM
-(
-SELECT category_small_cd AS median_scd, ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit_price) AS numeric), 0) AS median_unit_price
-FROM product_4
-GROUP BY category_small_cd
+FROM (
+    SELECT
+        category_small_cd AS median_scd,
+        ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit_price) AS numeric), 0) AS median_unit_price
+    FROM product_4
+    GROUP BY category_small_cd
 ) AS median_up_table
 WHERE unit_price IS NULL AND category_small_cd = median_scd
 
+-- 3. unit_costも同様。
 UPDATE product_4 SET
 unit_cost = median_uc_table.median_unit_cost
-FROM
-(
-SELECT category_small_cd AS median_scd, ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit_cost) AS numeric), 0) AS median_unit_cost
-FROM product_4
-GROUP BY category_small_cd
+FROM (
+    SELECT
+        category_small_cd AS median_scd,
+        ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit_cost) AS numeric), 0) AS median_unit_cost
+    FROM product_4
+    GROUP BY category_small_cd
 ) AS median_uc_table
 WHERE unit_cost IS NULL AND category_small_cd = median_scd
 
+-- 4. 2つのカラムにNULLが無いことを確認。
 SELECT
-SUM(CASE WHEN unit_price IS NULL THEN 1 ELSE 0 END) AS unit_price_NULL数,
-SUM(CASE WHEN unit_cost IS NULL THEN 1 ELSE 0 END) AS unit_cost_NULL数
+    SUM(CASE WHEN unit_price IS NULL THEN 1 ELSE 0 END) AS unit_price_NULL数,
+    SUM(CASE WHEN unit_cost IS NULL THEN 1 ELSE 0 END) AS unit_cost_NULL数
 FROM product_4
 
 -- S-084
 %%sql
-SELECT customer.customer_id, CAST(amount_2019 AS numeric)/ CAST(sum_amount AS numeric)
+SELECT customer.customer_id, CAST(amount_2019 AS numeric)/ CAST(sum_amount AS numeric) AS "2019年売上金額の割合"
 FROM customer
+-- 全期間の合計売上金額をINNER JOINする。
 INNER JOIN (
-    SELECT customer_id, SUM(amount) AS sum_amount FROM receipt GROUP BY customer_id
-) AS sum_amount_table
-ON customer.customer_id = sum_amount_table.customer_id
+        SELECT customer_id, SUM(amount) AS sum_amount FROM receipt GROUP BY customer_id
+    ) AS sum_amount_table
+    ON customer.customer_id = sum_amount_table.customer_id
+-- 2019年の合計売上金額も同様にINNER JOINする。
 INNER JOIN (
-    SELECT customer_id, SUM(amount) AS amount_2019 FROM receipt GROUP BY customer_id, LEFT(CAST(sales_ymd AS varchar), 4)
-) AS amount_2019_table
-ON customer.customer_id = amount_2019_table.customer_id
+        SELECT customer_id, SUM(amount) AS amount_2019 FROM receipt GROUP BY customer_id, LEFT(CAST(sales_ymd AS varchar), 4)
+    ) AS amount_2019_table
+    ON customer.customer_id = amount_2019_table.customer_id
 WHERE CAST(amount_2019 AS numeric)/ CAST(sum_amount AS numeric) > 0
 LIMIT 10
 
 -- S-085
 %%sql
-CREATE TABLE customer_1 AS
-(
-SELECT
-customer_id, customer_name, gender_cd, gender, birth_day, age, customer.postal_cd, address, application_store_cd, application_date, status_cd,
-avg_longitude AS longitude, avg_latitude AS latitude
-FROM customer
-LEFT OUTER JOIN
-(
-SELECT postal_cd, AVG(longitude) AS avg_longitude, AVG(latitude) AS avg_latitude
-FROM geocode
-GROUP BY postal_cd
-) AS fixed_geocode
-ON customer.postal_cd = fixed_geocode.postal_cd
+CREATE TABLE customer_1 AS (
+    SELECT
+        customer.*,
+        avg_longitude AS longitude,
+        avg_latitude AS latitude
+    FROM customer
+    LEFT OUTER JOIN (
+        SELECT postal_cd, AVG(longitude) AS avg_longitude, AVG(latitude) AS avg_latitude
+        FROM geocode
+        GROUP BY postal_cd
+    ) AS fixed_geocode
+    ON customer.postal_cd = fixed_geocode.postal_cd
 )
 
 -- S-086
 %%sql
-SELECT customer_id, customer_1.address, store.address,
-6371 * ACOS(SIN(RADIANS(customer_1.latitude)) * SIN(RADIANS(store.latitude)) + COS(RADIANS(customer_1.latitude)) * COS(RADIANS(store.latitude)) * COS(RADIANS(customer_1.longitude) - RADIANS(store.longitude)))
+SELECT
+    customer_id,
+    customer_1.address,
+    store.address,
+    6371 * ACOS(SIN(RADIANS(customer_1.latitude)) * SIN(RADIANS(store.latitude)) + COS(RADIANS(customer_1.latitude)) * COS(RADIANS(store.latitude)) * COS(RADIANS(customer_1.longitude) - RADIANS(store.longitude))) AS "距離(km)"
 FROM customer_1
 LEFT OUTER JOIN store ON customer_1.application_store_cd = store.store_cd
 LIMIT 10
 
 -- S-087
 %%sql
-CREATE TABLE customer_u AS
-(
-SELECT
-MIN(customer_id) AS customer_id,
-sum_fixed_customer.customer_name,
-MIN(gender_cd) AS gender_cd,
-MIN(gender) AS gender,
-MIN(birth_day) AS birth_day,
-MIN(age) AS age,
-sum_fixed_customer.postal_cd,
-MIN(address) AS address,
-MIN(application_store_cd) AS application_store_cd,
-MIN(application_date) AS application_date,
-MIN(status_cd) AS status_cd,
-MIN(max_amount)
-FROM
-(
-    SELECT *
-    FROM customer
-    LEFT OUTER JOIN (SELECT customer_id AS cid, SUM(amount) AS sum_amount FROM receipt GROUP BY customer_id) AS sum_amount_table
-    ON customer.customer_id = sum_amount_table.cid
-) AS sum_fixed_customer
-LEFT OUTER JOIN
-(
-    SELECT customer_name, postal_cd, MAX(sum_amount) AS max_amount
-    FROM
-    (
-        SELECT *
-        FROM customer
+/*
+方針として、
+1. customer_idごとに購入金額を集計(sum_amount)する。
+2. customer_name, postal_cdでグルーピングし、1で求めたsum_amountの最大値を算出(max_amount)する
+3. sum_amountとmax_amountが同値を取るレコードのみ残す。
+4. なお同一名義・郵便番号で複数レコードが残っている場合に備え、これらでグルーピングを行い、
+   元々のcustomerに定義づけられている残りのカラム全てをMINにて算出する。
+5. 以上のSELECT句にてCREATE TABLEする。
+*/
+CREATE TABLE customer_u AS (
+    SELECT
+        MIN(customer_id) AS customer_id,
+        sum_fixed_customer.customer_name,
+        MIN(gender_cd) AS gender_cd,
+        MIN(gender) AS gender,
+        MIN(birth_day) AS birth_day,
+        MIN(age) AS age,
+        sum_fixed_customer.postal_cd,
+        MIN(address) AS address,
+        MIN(application_store_cd) AS application_store_cd,
+        MIN(application_date) AS application_date,
+        MIN(status_cd) AS status_cd,
+        MIN(max_amount)
+    -- 上記4.の手続き。
+
+    FROM (
+        SELECT * FROM customer
         LEFT OUTER JOIN (SELECT customer_id AS cid, SUM(amount) AS sum_amount FROM receipt GROUP BY customer_id) AS sum_amount_table
         ON customer.customer_id = sum_amount_table.cid
-    ) AS sum_fixed_customer2
-    GROUP BY customer_name, postal_cd
-) AS max_fixed_customer
-ON sum_fixed_customer.customer_name = max_fixed_customer.customer_name
-AND sum_fixed_customer.postal_cd = max_fixed_customer.postal_cd
-WHERE sum_amount = max_amount OR sum_amount IS NULL
-GROUP BY sum_fixed_customer.customer_name, sum_fixed_customer.postal_cd
+    ) AS sum_fixed_customer
+    LEFT OUTER JOIN (
+        SELECT customer_name, postal_cd, MAX(sum_amount) AS max_amount
+        FROM (
+            SELECT * FROM customer
+            LEFT OUTER JOIN (SELECT customer_id AS cid, SUM(amount) AS sum_amount FROM receipt GROUP BY customer_id) AS sum_amount_table
+            ON customer.customer_id = sum_amount_table.cid
+        -- 上記1.の手続き。
+
+        ) AS sum_fixed_customer2
+        GROUP BY customer_name, postal_cd
+    ) AS max_fixed_customer
+    -- 上記2.の手続き。
+
+    ON sum_fixed_customer.customer_name = max_fixed_customer.customer_name
+    AND sum_fixed_customer.postal_cd = max_fixed_customer.postal_cd
+    WHERE sum_amount = max_amount OR sum_amount IS NULL
+    -- 上記3.の手続き。
+
+    GROUP BY sum_fixed_customer.customer_name, sum_fixed_customer.postal_cd
 )
 
 -- S-088
 %%sql
-CREATE TABLE customer_n AS
-(
-SELECT customer_id_n, customer_id, customer_name, gender_cd, gender, birth_day, age, customer.postal_cd, address, application_store_cd, application_date, status_cd
-FROM customer
-LEFT OUTER JOIN (SELECT customer_id AS customer_id_n, customer_name AS u_name, postal_cd AS u_pcode FROM customer_u) AS c_u
-ON customer.customer_name = u_name AND customer.postal_cd = u_pcode
+CREATE TABLE customer_n AS (
+    SELECT customer_id_n, customer.*
+    FROM customer
+    LEFT OUTER JOIN (SELECT customer_id AS customer_id_n, customer_name AS u_name, postal_cd AS u_pcode FROM customer_u) AS c_u
+    ON customer.customer_name = u_name AND customer.postal_cd = u_pcode
 )
 
 -- S-089
 %%sql
-CREATE TABLE testtable_customer_n AS
-(
+-- 1. 売上実績のある顧客を抽出し、その中からランダムに20％を抽出し、CREATE TABLEする。
+CREATE TABLE testtable_customer_n AS (
     SELECT * FROM customer_n
-    WHERE customer_id IN
-        (
+    WHERE customer_id IN (
             SELECT customer_id
-            FROM
-                (
+            FROM (
                     SELECT RANDOM() AS random_num, customer_id
                     FROM customer_n
                     WHERE customer_id IN (SELECT customer_id FROM receipt)
-                ) AS for_testtable
+            ) AS for_testtable
             WHERE random_num < 0.2
         )
-
 )
 
-CREATE TABLE learntable_customer_n AS
-(
-    SELECT * FROM
-    (
+-- 2. 1.で作成したテーブルを利用し、売上実績のある残りの顧客を抽出する。
+CREATE TABLE learntable_customer_n AS (
+    SELECT * FROM (
         SELECT customer_id FROM customer_n WHERE customer_id IN (SELECT customer_id FROM receipt)
     ) AS shopped_member
     WHERE customer_id NOT IN (SELECT customer_id FROM testtable_customer_n)
@@ -850,31 +881,29 @@ CREATE TABLE learntable_customer_n AS
 
 -- S-090
 %%sql
-CREATE TABLE learntable_monthly_amount AS
-(
-SELECT sales_ym, sum_amount, test_num1, test_num2, test_num3
-FROM
-(
-    SELECT ROW_NUMBER() OVER (ORDER BY LEFT(CAST(sales_ymd AS varchar), 6)) AS row_num, LEFT(CAST(sales_ymd AS varchar), 6) AS sales_ym, SUM(amount) AS sum_amount
-    FROM receipt
-    GROUP BY LEFT(CAST(sales_ymd AS varchar), 6)
-) AS monthly_amount
-CROSS JOIN
-(
-    SELECT
-        TRUNC(CAST(RANDOM() AS numeric) * 23, 0) + 1 AS learn_num,
-        TRUNC(CAST(RANDOM() AS numeric) * 29, 0) + 1 AS test_num1,
-        TRUNC(CAST(RANDOM() AS numeric) * 29, 0) + 1 AS test_num2,
-        TRUNC(CAST(RANDOM() AS numeric) * 29, 0) + 1 AS test_num3
-)AS random_num
-WHERE row_num BETWEEN learn_num AND learn_num + 11
+-- 1. 1~23の整数を生成するlearn_num, 1~29の整数を生成するtest_num1~3を作成する。
+-- 2. learn_numを起点に12の連番を取得し、学習用テーブルを作成。学習用テーブルにはtest_num1~3を持たせる。
+CREATE TABLE learntable_monthly_amount AS (
+    SELECT sales_ym, sum_amount, test_num1, test_num2, test_num3
+    FROM (
+        SELECT ROW_NUMBER() OVER (ORDER BY LEFT(CAST(sales_ymd AS varchar), 6)) AS row_num, LEFT(CAST(sales_ymd AS varchar), 6) AS sales_ym, SUM(amount) AS sum_amount
+        FROM receipt
+        GROUP BY LEFT(CAST(sales_ymd AS varchar), 6)
+    ) AS monthly_amount
+    CROSS JOIN (
+        SELECT
+            TRUNC(CAST(RANDOM() AS numeric) * 23, 0) + 1 AS learn_num,
+            TRUNC(CAST(RANDOM() AS numeric) * 29, 0) + 1 AS test_num1,
+            TRUNC(CAST(RANDOM() AS numeric) * 29, 0) + 1 AS test_num2,
+            TRUNC(CAST(RANDOM() AS numeric) * 29, 0) + 1 AS test_num3
+    )AS random_num
+    WHERE row_num BETWEEN learn_num AND learn_num + 11
 )
 
-CREATE TABLE testtable1_monthly_amount AS
-(
+-- 3. test_num1~3を利用し、テスト用テーブルを3つ作成。
+CREATE TABLE testtable1_monthly_amount AS (
     SELECT sales_ym, sum_amount
-    FROM
-    (
+    FROM (
         SELECT ROW_NUMBER() OVER (ORDER BY LEFT(CAST(sales_ymd AS varchar), 6)) AS row_num, LEFT(CAST(sales_ymd AS varchar), 6) AS sales_ym, SUM(amount) AS sum_amount
         FROM receipt
         GROUP BY LEFT(CAST(sales_ymd AS varchar), 6)
@@ -882,11 +911,9 @@ CREATE TABLE testtable1_monthly_amount AS
     WHERE row_num BETWEEN (SELECT MIN(test_num1) FROM learntable_monthly_amount) AND (SELECT MIN(test_num1) FROM learntable_monthly_amount) + 5
 )
 
-CREATE TABLE testtable2_monthly_amount AS
-(
+CREATE TABLE testtable2_monthly_amount AS (
     SELECT sales_ym, sum_amount
-    FROM
-    (
+    FROM (
         SELECT ROW_NUMBER() OVER (ORDER BY LEFT(CAST(sales_ymd AS varchar), 6)) AS row_num, LEFT(CAST(sales_ymd AS varchar), 6) AS sales_ym, SUM(amount) AS sum_amount
         FROM receipt
         GROUP BY LEFT(CAST(sales_ymd AS varchar), 6)
@@ -894,11 +921,9 @@ CREATE TABLE testtable2_monthly_amount AS
     WHERE row_num BETWEEN (SELECT MIN(test_num2) FROM learntable_monthly_amount) AND (SELECT MIN(test_num2) FROM learntable_monthly_amount) + 5
 )
 
-CREATE TABLE testtable3_monthly_amount AS
-(
+CREATE TABLE testtable3_monthly_amount AS (
     SELECT sales_ym, sum_amount
-    FROM
-    (
+    FROM (
         SELECT ROW_NUMBER() OVER (ORDER BY LEFT(CAST(sales_ymd AS varchar), 6)) AS row_num, LEFT(CAST(sales_ymd AS varchar), 6) AS sales_ym, SUM(amount) AS sum_amount
         FROM receipt
         GROUP BY LEFT(CAST(sales_ymd AS varchar), 6)
@@ -906,53 +931,55 @@ CREATE TABLE testtable3_monthly_amount AS
     WHERE row_num BETWEEN (SELECT MIN(test_num3) FROM learntable_monthly_amount) AND (SELECT MIN(test_num3) FROM learntable_monthly_amount) + 5
 )
 
+-- 4. 学習用テーブルに残っているtest_num1~3を削除。
 ALTER TABLE learntable_monthly_amount DROP test_num1, DROP test_num2, DROP test_num3
 
 -- S-091
 %%sql
-WITH shopped_member_1percent AS
-(
+-- 売上実績のある顧客1%と売上実績のない顧客全てのインラインビューを作成する。
+-- 実績のない顧客のビューにはRANDOMを降順で並べ、ROW_NUMBERを振る。
+WITH shopped_member_1percent AS (
     SELECT customer_id
-    FROM
-    (
+    FROM (
         SELECT RANDOM() AS random_num1, customer_id
         FROM customer
         WHERE customer_id IN (SELECT customer_id FROM receipt)
     ) AS shopped_mem
     WHERE random_num1 > 0.99
 ),
-not_shopped_member AS
-(
+not_shopped_member AS (
     SELECT ROW_NUMBER() OVER (ORDER BY random_num2) AS row_num, customer_id
-    FROM
-    (
-    SELECT RANDOM() AS random_num2, customer_id
-    FROM customer
-    WHERE customer_id NOT IN (SELECT customer_id FROM receipt)
+    FROM (
+        SELECT RANDOM() AS random_num2, customer_id
+        FROM customer
+        WHERE customer_id NOT IN (SELECT customer_id FROM receipt)
     ) AS not_shopped_mem
 )
+
+-- 1%の実績がある顧客は上記のビューで抽出済み。それと同数の実績のない顧客を抽出する。
 SELECT * FROM customer
 WHERE customer_id IN (SELECT customer_id FROM shopped_member_1percent)
-OR customer_id IN
-(
+OR customer_id IN (
     SELECT customer_id FROM not_shopped_member
     WHERE row_num <= (SELECT COUNT(*) FROM shopped_member_1percent)
 )
 
 -- S-092
 %%sql
+-- 1. genderというテーブルをCREATE TABLEする。
 CREATE TABLE gender (
     gender_cd integer,
     gender char(2)
 )
 
+-- 2. customerが持っていた性別の情報を挿入する。
 INSERT INTO gender VALUES (0, '男性'), (1, '女性'), (9, '不明')
 
+-- 3. customerのgenderカラムを削除。
 ALTER TABLE customer DROP COLUMN gender
 
 -- S-093
 %%sql
-/*
 CREATE TABLE product_withname AS (
     SELECT product_cd, product.category_major_cd, category_major_name, product.category_medium_cd, category_medium_name,
     product.category_small_cd, category_small_name, unit_price, unit_cost
@@ -972,6 +999,7 @@ COPY product_withname TO '/tmp/data/product3.csv' WITH CSV ENCODING 'UTF8' DELIM
 
 -- S-097
 %%sql
+-- S-093で作成したテーブルを流用し、全レコードを削除することでカラムのデータ型を利用する。以下の設問も同じ。
 CREATE TABLE product1 AS SELECT * FROM product_withname
 
 TRUNCATE TABLE product1
