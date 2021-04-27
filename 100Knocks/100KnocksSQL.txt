@@ -455,7 +455,7 @@ LIMIT 10
 
 -- S-062
 %%sql
-SELECT customer_id, sum_amount, LN(sum_amount)
+SELECT customer_id, sum_amount, LN(sum_amount + 1)
 FROM (
     SELECT customer_id, SUM(amount) AS sum_amount
     FROM receipt
@@ -597,7 +597,6 @@ WHERE customer_id IN (
 LIMIT 10
 
 -- S-076
-%%sql
 %%sql
 -- あらかじめRANDOMを持つテーブルを3つ用意する。
 WITH
