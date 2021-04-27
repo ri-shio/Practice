@@ -173,7 +173,8 @@ LIMIT 5
 SELECT
     PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY amount) AS Q1,
     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) AS Q2,
-    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY amount) AS Q3
+    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY amount) AS Q3,
+    PERCENTILE_CONT(1.0) WITHIN GROUP (ORDER BY amount) AS Q4
 FROM receipt
 
 -- S-033
@@ -201,7 +202,8 @@ LIMIT 10
 
 -- S-036
 %%sql
-SELECT receipt.*, store_name FROM receipt
+SELECT receipt.*, store_name
+FROM receipt
 INNER JOIN store ON receipt.store_cd = store.store_cd
 LIMIT 10
 
@@ -246,7 +248,7 @@ SELECT
 -- ウィンドウ関数にて1日前の合計金額を取得。
     sum_amount - MIN(sum_amount) OVER (ORDER BY sales_ymd DESC ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING) AS 売上金額増減
 FROM(
-    SELECT sales_ymd, SUM(amount) sum_amount
+    SELECT sales_ymd, SUM(amount) AS sum_amount
     FROM receipt
     GROUP BY sales_ymd
 ) AS sum_amount_table
@@ -303,7 +305,6 @@ LIMIT 10
 
 -- S-047
 %%sql
-%%sql
 SELECT receipt_no, receipt_sub_no, CAST(CAST(sales_ymd AS varchar) AS date)
 -- integerから直接dateには出来ないよう。
 FROM receipt
@@ -335,7 +336,7 @@ LIMIT 10
 
 -- S-052
 %%sql
-SELECT customer_id, SUM(amount), CASE WHEN SUM(amount) <= 2000 THEN 0 ELSE 1 END
+SELECT customer_id, SUM(amount), CASE WHEN SUM(amount) <= 2000 THEN 0 WHEN SUM(amount) > 2000 THEN 1 ELSE NULL END
 FROM (SELECT * FROM receipt WHERE customer_id !~ '^Z.*') AS mem_table
 GROUP BY customer_id
 LIMIT 10
@@ -343,13 +344,15 @@ LIMIT 10
 -- S-053
 %%sql
 SELECT
+-- 下記2つのフラグを用いて、東京とそれ以外で非NULLのレコード１件を1として数え、合計する。
     SUM(CASE WHEN flag_tokyo = 1 THEN flag_purchase ELSE 0 END) AS Tokyo,
     SUM(CASE WHEN flag_tokyo = 0 THEN flag_purchase ELSE 0 END) AS Others
 FROM(
 -- 郵便番号が100〜209の間かどうか(flag_tokyo)、およびsales_ymdがNULLかどうか(flag_purchase)を判定。
-SELECT
-    CASE WHEN CAST(LEFT(postal_cd, 3) AS integer) >= 100 THEN CASE WHEN CAST(LEFT(postal_cd, 3) AS integer) <= 209 THEN 1 ELSE 0 END ELSE 0 END AS flag_tokyo,
-    CASE WHEN sales_ymd IS NOT NULL THEN 1 ELSE 0 END AS flag_purchase
+SELECT DISTINCT
+    CASE WHEN CAST(LEFT(postal_cd, 3) AS integer) >= 100 AND CAST(LEFT(postal_cd, 3) AS integer) <= 209 THEN 1 ELSE 0 END AS flag_tokyo,
+    CASE WHEN sales_ymd IS NOT NULL THEN 1 ELSE 0 END AS flag_purchase,
+    customer.customer_id
     FROM customer FULL OUTER JOIN receipt ON customer.customer_id = receipt.customer_id
 ) AS flag_table
 
@@ -441,7 +444,7 @@ LIMIT 10
 
 -- S-061
 %%sql
-SELECT customer_id, sum_amount, LOG(sum_amount)
+SELECT customer_id, sum_amount, LOG(sum_amount + 1)
 FROM (
     SELECT customer_id, SUM(amount) AS sum_amount
     FROM receipt
