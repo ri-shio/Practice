@@ -5,26 +5,26 @@ Sub Q9()
     Dim ws As Worksheet
     Dim flg As Boolean
     flg = False
-    
+
     For Each ws In Worksheets
-        If ws.Name = "‡ŠiÒ" Then flg = True
+        If ws.Name = "åˆæ ¼è€…" Then flg = True
     Next ws
-    
+
     If flg = False Then
         Set ws = Worksheets.Add
-        ws.Name = "‡ŠiÒ"
+        ws.Name = "åˆæ ¼è€…"
     End If
-    
-    Worksheets("‡ŠiÒ").Cells.Clear
-    
+
+    Worksheets("åˆæ ¼è€…").Cells.Clear
+
     Dim i As Long, j As Long
     j = 1
-    
-    For i = 2 To Worksheets("¬Ñ•\").Cells(1, 1).CurrentRegion.Rows.Count
-        If Worksheets("¬Ñ•\").Cells(i, 7) = "‡Ši" Then
-            Worksheets("‡ŠiÒ").Cells(j, 1) = Worksheets("¬Ñ•\").Cells(i, 1)
+
+    For i = 2 To Worksheets("æˆç¸¾è¡¨").Cells(1, 1).CurrentRegion.Rows.Count
+        If Worksheets("æˆç¸¾è¡¨").Cells(i, 7) = "åˆæ ¼" Then
+            Worksheets("åˆæ ¼è€…").Cells(j, 1) = Worksheets("æˆç¸¾è¡¨").Cells(i, 1)
             j = j + 1
         End If
     Next
-    
+
 End Sub
