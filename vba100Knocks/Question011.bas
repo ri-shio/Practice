@@ -7,7 +7,7 @@ Sub Q11()
         For j = 1 To Cells(1, 1).CurrentRegion.Rows.Count
             If Cells(j, i).MergeCells Then
                 Cells(j, i).ClearComments
-                Cells(j, i).AddComment "Œ‹‡ƒZƒ‹"
+                Cells(j, i).AddComment "çµåˆã‚»ãƒ«"
             End If
         Next
     Next
