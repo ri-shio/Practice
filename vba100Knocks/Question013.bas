@@ -10,10 +10,10 @@ Dim i As Integer
 
 If TypeName(Selection) = "Range" Then
     For Each rng In Selection
-        If rng.Value Like "*íçà”*" Then
+        If rng.Value Like "*Ê≥®ÊÑè*" Then
             instr_count = 0
             Do
-                instr_count = InStr(instr_count + 1, rng.Value, "íçà”")
+                instr_count = InStr(instr_count + 1, rng.Value, "Ê≥®ÊÑè")
                 If instr_count = 0 Then Exit Do
                 With rng.Characters(instr_count, 2).Font
                   .Bold = True
