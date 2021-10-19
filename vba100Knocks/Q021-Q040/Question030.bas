@@ -5,28 +5,28 @@ Sub Q30()
     Application.CutCopyMode = False
 
     Dim i As Integer
-    For i = 1 To Sheets("–¼•ë").Cells(1, 1).CurrentRegion.Rows.Count - 1
+    For i = 1 To Sheets("åç°¿").Cells(1, 1).CurrentRegion.Rows.Count - 1
         If i Mod 2 = 1 Then
             If i >= 3 Then
-                Sheets("–¼D").Rows(i).RowHeight = Sheets("–¼D").Rows(1).RowHeight
-                Sheets("–¼D").Rows(i + 1).RowHeight = Sheets("–¼D").Rows(2).RowHeight
-                Sheets("–¼D").Range("A1:A2").Copy
+                Sheets("åæœ­").Rows(i).RowHeight = Sheets("åæœ­").Rows(1).RowHeight
+                Sheets("åæœ­").Rows(i + 1).RowHeight = Sheets("åæœ­").Rows(2).RowHeight
+                Sheets("åæœ­").Range("A1:A2").Copy
                 DoEvents
-                Sheets("–¼D").Range(Cells(i, 1), Cells(i + 1, 1)).PasteSpecial Paste:=xlPasteFormats
+                Sheets("åæœ­").Range(Cells(i, 1), Cells(i + 1, 1)).PasteSpecial Paste:=xlPasteFormats
             End If
             
-            Sheets("–¼D").Cells(i, 1) = Sheets("–¼•ë").Cells(i + 1, 2)
-            Sheets("–¼D").Cells(i + 1, 1) = Sheets("–¼•ë").Cells(i + 1, 3)
+            Sheets("åæœ­").Cells(i, 1) = Sheets("åç°¿").Cells(i + 1, 2)
+            Sheets("åæœ­").Cells(i + 1, 1) = Sheets("åç°¿").Cells(i + 1, 3)
             
         Else
             If i >= 4 Then
-                Sheets("–¼D").Range("B1:B2").Copy
+                Sheets("åæœ­").Range("B1:B2").Copy
                 DoEvents
-                Sheets("–¼D").Range(Cells(i - 1, 2), Cells(i, 2)).PasteSpecial Paste:=xlPasteFormats
+                Sheets("åæœ­").Range(Cells(i - 1, 2), Cells(i, 2)).PasteSpecial Paste:=xlPasteFormats
             End If
             
-            Sheets("–¼D").Cells(i - 1, 2) = Sheets("–¼•ë").Cells(i + 1, 2)
-            Sheets("–¼D").Cells(i, 2) = Sheets("–¼•ë").Cells(i + 1, 3)
+            Sheets("åæœ­").Cells(i - 1, 2) = Sheets("åç°¿").Cells(i + 1, 2)
+            Sheets("åæœ­").Cells(i, 2) = Sheets("åç°¿").Cells(i + 1, 3)
         End If
     Next
     
