@@ -1,7 +1,7 @@
 Attribute VB_Name = "Module2"
 Option Explicit
 
-Sub Q11()
+Sub Q12()
     Dim i As Long, j As Long, k As Long
     Dim mgrange As Variant
     Dim divcount As Integer

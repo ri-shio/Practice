@@ -6,11 +6,11 @@ Sub Q45()
     Set tbl = ActiveSheet.ListObjects(1)
     
     tbl.ListColumns.Add Position:=4
-    tbl.HeaderRowRange(4) = "‡Œv—ñ1"
+    tbl.HeaderRowRange(4) = "åˆè¨ˆåˆ—1"
     tbl.Range.Cells(2, 4).FormulaR1C1 = "=SUM(RC[-3]:RC[-1])"
     
     tbl.ListColumns.Add Position:=7
-    tbl.HeaderRowRange(7) = "‡Œv—ñ2"
+    tbl.HeaderRowRange(7) = "åˆè¨ˆåˆ—2"
     tbl.Range.Cells(2, 7).FormulaR1C1 = "=SUM(RC[-2]:RC[-1])"
     
 End Sub
