@@ -15,9 +15,9 @@ Sub Q40()
         sht_exists = False
         Set wb = Workbooks.Open(filePath & fileName)
             For Each sht In wb.Sheets
-                If sht.Name = "2020”N12ŒŽ" Then
+                If sht.Name = "2020å¹´12æœˆ" Then
                     sht.Range(sht.Cells(2, 1), sht.Cells(sht.Cells(2, 1).CurrentRegion.Rows.Count, sht.Cells(2, 1).CurrentRegion.Columns.Count)).Copy _
-                    Destination:=ThisWorkbook.Sheets("2020”N12ŒŽ").Cells(ThisWorkbook.Sheets("2020”N12ŒŽ").Cells(1, 1).CurrentRegion.Rows.Count, 1).Offset(1, 0)
+                    Destination:=ThisWorkbook.Sheets("2020å¹´12æœˆ").Cells(ThisWorkbook.Sheets("2020å¹´12æœˆ").Cells(1, 1).CurrentRegion.Rows.Count, 1).Offset(1, 0)
                     Exit For
                 End If
             Next
