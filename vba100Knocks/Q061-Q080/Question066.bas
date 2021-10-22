@@ -14,7 +14,7 @@ End Sub
 Sub FileCheck(ByVal cPath As String, ByRef hitCnt As Integer)
 
     Dim fso As FileSystemObject
-    Set fso = New FileSystemObject
+    Set fso = CreateObject("Scripting.FileSystemObject")
     
     Dim tFile As File
     
